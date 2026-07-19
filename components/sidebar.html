@@ -1,0 +1,53 @@
+<!-- Header Sidebar -->
+<div class="p-4 w-full border-b border-base-200 flex justify-between items-center bg-base-50 flex-none">
+  <div>
+    <h2 class="text-lg font-black tracking-wider text-primary">Xplore 3571</h2>
+    <p class="text-xs text-base-content/60">Explorasi data spasial dinamis</p>
+  </div>
+  <button id="btn-close-sidebar-inner" class="btn btn-sm btn-circle btn-ghost" title="Tutup Menu">✕</button>
+</div>
+
+<!-- Body Kontrol Sidebar (Menggunakan padding simetris p-4 dan flex layout biasa) -->
+<div class="p-4 flex-1 overflow-y-auto flex flex-col gap-5 w-full">
+  
+  <!-- 1. Base Map Switcher Segment -->
+  <section class="flex flex-col gap-2 w-full">
+    <span class="text-xs font-bold uppercase tracking-wider text-base-content/50">Peta Dasar</span>
+    <div class="join w-full grid grid-cols-2">
+      <button id="basemap-osm" class="btn btn-sm join-item btn-active btn-primary w-full">OpenStreetMap</button>
+      <button id="basemap-google" class="btn btn-sm join-item w-full">Google Hybrid</button>
+    </div>
+  </section>
+
+  <!-- 2. Polygon Region Management Segment -->
+  <section class="flex flex-col gap-2 w-full">
+    <span class="text-xs font-bold uppercase tracking-wider text-base-content/50">Layer Wilayah Poligon</span>
+    <button id="btn-trigger-polygon-modal" class="btn btn-sm btn-outline btn-secondary w-full gap-2">
+      🔷 Muat Poligon Wilayah
+    </button>
+  </section>
+
+  <!-- 3. Multi-Source Building Point Loader Segment -->
+  <section class="flex flex-col gap-2 w-full">
+    <span class="text-xs font-bold uppercase tracking-wider text-base-content/50">Sumber Data Bangunan</span>
+    <button id="btn-trigger-building-modal" class="btn btn-sm btn-primary w-full gap-2">
+      📍 Muat Titik Bangunan
+    </button>
+  </section>
+
+  <!-- 4. Dynamic Region Filter Segment -->
+  <section class="flex flex-col gap-2 w-full">
+    <span class="text-xs font-bold uppercase tracking-wider text-base-content/50">Filter Spasial Wilayah</span>
+    <div class="flex flex-col gap-2 w-full">
+      <select id="filter-prov" class="select select-bordered select-sm w-full" disabled>
+        <option value="">-- Provinsi --</option>
+      </select>
+      <select id="filter-kab" class="select select-bordered select-sm w-full" disabled>
+        <option value="">-- Kota / Kabupaten --</option>
+      </select>
+      <select id="filter-kec" class="select select-bordered select-sm w-full" disabled>
+        <option value="">-- Kecamatan --</option>
+      </select>
+    </div>
+  </section>
+</div>

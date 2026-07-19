@@ -1,21 +1,21 @@
 {
-  "short_name": "Xplore 3571",
-  "name": "WebGIS Exporasi 3571",
+  "short_name": "Xplore3571",
+  "name": "Xplore 3571 - GIS PWA",
   "icons": [
     {
-      "src": "icon-192.png",
-      "type": "image/png",
+      "src": "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=192&h=192&fit=crop",
+      "type": "image/jpeg",
       "sizes": "192x192"
     },
     {
-      "src": "icon-512.png",
-      "type": "image/png",
+      "src": "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=512&h=512&fit=crop",
+      "type": "image/jpeg",
       "sizes": "512x512"
     }
   ],
-  "start_url": "/index.html",
-  "background_color": "#ffffff",
-  "theme_color": "#0b5ed7",
+  "start_url": "./index.html",
+  "background_color": "#f3f4f6",
+  "theme_color": "#4f46e5",
   "display": "standalone",
-  "orientation": "portrait"
+  "orientation": "portrait-primary"
 }

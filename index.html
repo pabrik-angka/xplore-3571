@@ -1,72 +1,46 @@
-<!doctype html>
-<html lang="id">
+<!DOCTYPE html>
+<html lang="id" data-theme="bumblebee">
 <head>
-  <meta charset="utf-8" />
-  <title>WebGIS - PWA Direktori Usaha</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0b5ed7" />
-
-  <!-- Leaflet & PapaParse -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xplore 3571 - GIS PWA</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  
+  <!-- Tailwind v4 & DaisyUI v5 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css">
+  
+  <!-- Leaflet GIS Engine CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-
-  <style>
-    html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
-    #map { width: 100%; height: 100%; }
-
-    /* Floating Toolbar Container */
-    #toolbar {
-      position: absolute;
-      top: 10px; left: 50px; right: 10px;
-      background: rgba(255, 255, 255, 0.95);
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 10px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      z-index: 1000;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }
-    
-    select, button {
-      padding: 6px 12px;
-      font-size: 13px;
-      border-radius: 4px;
-      border: 1px solid #bbb;
-      background: white;
-      cursor: pointer;
-    }
-    button:hover { background: #f0f0f0; }
-    
-    /* Utility class */
-    .hidden { display: none; }
-  </style>
 </head>
-<body>
+<body class="h-screen w-screen overflow-hidden bg-base-200 font-sans antialiased">
 
-<div id="map">
-  <!-- Dynamic Toolbar -->
-  <!-- index.html (Potongan bagian toolbar) -->
-<div id="toolbar">
-  <!-- Load Layer SLS -->
-  <button id="btnLoadSLS">📂 Load Polygon SLS</button>
-  <input type="file" id="fileSLS" accept=".geojson,.json" class="hidden" />
+  <!-- Main Layout Grid Builder -->
+  <div class="flex h-full w-full overflow-hidden">
+    
+    <!-- Sidebar Left Layout (Dikelola Komponen Dinamis) -->
+    <aside id="sidebar-container" class="h-full w-80 bg-base-100 border-r border-base-300 transition-all duration-300 flex flex-col flex-none z-50 shadow-xl"></aside>
+    
+    <!-- Main Content Area Right Layout -->
+    <div class="flex-1 flex flex-col h-full overflow-hidden relative">
+      <!-- Top Navbar Container -->
+      <div id="navbar-container" class="w-full flex-none"></div>
 
-  <!-- Load Layer Titik Bangunan Dinamis -->
-  <button id="btnLoadTitik">📍 Load Titik Bangunan (Dinamis)</button>
-  <input type="file" id="fileTitik" accept=".csv,.geojson,.json" class="hidden" />
+      <!-- Map Container Area -->
+      <main class="flex-1 w-full h-full relative z-10">
+        <div id="map" class="w-full h-full"></div>
+      </main>
+    </div>
+  </div>
 
-  <!-- Dropdown Filter Wilayah (3 Tingkat Dinamis) -->
-  <select id="filterKec" disabled><option value="">-- Kecamatan --</option></select>
-  <select id="filterDesa" disabled><option value="">-- Desa --</option></select>
-  <select id="filterSLS" disabled><option value="">-- SLS --</option></select>
-</div>
-</div>
+  <!-- Shared Modals Area Container (Injeksi Dialog via ui.js) -->
+  <div id="modal-container"></div>
 
-<!-- Main Application Loader -->
-<script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
