@@ -47,11 +47,13 @@ export const bangunanTemplateHandler = {
 
     // Keyword pencarian fuzzy live-search gabungan nama pemilik & fungsi bangunan
     const searchKeyword = `${pemilik} ${fungsiBgn} ${idBgn}`.toLowerCase();
+    const searchTitle = pemilik !== '-' ? pemilik : (idBgn !== '-' ? `ID: ${idBgn}` : 'Bangunan Tanpa Nama');
 
     return {
       geometry: { lat, lng },
       popupHtml: popupHtml,
-      searchKeyword: searchKeyword
+      searchKeyword: searchKeyword,
+      searchTitle: searchTitle
     };
   },
 

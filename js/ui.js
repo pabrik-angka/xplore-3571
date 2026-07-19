@@ -3,6 +3,7 @@
  */
 import { getAllPolygonSources, getPolygonHandler } from './polygonRegistry.js';
 import { getAllBuildingSources, getHandler } from './sourceRegistry.js';
+import { SearchComponent } from './components/search.js';
 
 // component modal load file
 import { openSpatialModal } from './components/modal.js';
@@ -41,7 +42,9 @@ export const UI = {
     this.setupBasemapToggle();
     this.setupModalTriggers();
     this.setupNetworkMonitoring();
-    this.setupSearchFocus();
+    
+    // Inisialisasi komponen pencarian
+    SearchComponent.init();
     console.log('✔ UI Module initialized cleanly with external Modal Component.');
   },
 
@@ -175,8 +178,34 @@ export const UI = {
       return;
     }
 
-    this.showToast(`✔ Berkas Bangunan siap diproses dengan handler terkait!`, 'success');
-    // TODO: Integrasikan dengan parser CSV/GeoJSON bangunan pada Fase berikutnya
+    import('./store.js').then(({ Store }) => {
+      Store.processBuildingFile(file, targetSource)
+        .then((buildingLayerSet) => {
+          this.showToast(`✔ Berkas Bangunan berhasil dirender!`, 'success');
+          
+          import('./map.js').then(({ MapEngine }) => {
+            // 1. Reset filter UI di dropdown (jika ada) agar semua kembali utuh
+            const selKec = document.getElementById('filter-sel-kec');
+            const selDesa = document.getElementById('filter-sel-desa');
+            const selSls = document.getElementById('filter-sel-sls');
+            if (selKec) selKec.value = '';
+            if (selDesa) { selDesa.innerHTML = '<option value="">-- DESA --</option>'; selDesa.disabled = true; }
+            if (selSls) { selSls.innerHTML = '<option value="">-- SLS --</option>'; selSls.disabled = true; }
+
+            // 2. Terapkan filter kosong (reset) ke peta agar seluruh polygon muncul utuh
+            MapEngine.applyPolygonFilter({ kec: '', desa: '', sls: '' });
+
+            // 3. Render file bangunan ke peta (MapEngine akan memasukkan titik & memanggil applySpatialFilter)
+            MapEngine.renderBuilding(buildingLayerSet);
+            
+            // 4. Panggil ulang applySpatialFilter memastikan state mengikuti polygon utuh
+            MapEngine.applySpatialFilter();
+          });
+        })
+        .catch(err => {
+          this.showToast(`❌ Galat Bangunan: ${err}`, 'error');
+        });
+    });
   },
 
   /**
@@ -197,22 +226,8 @@ export const UI = {
   },
 
   /**
-   * Kontrol visual kolom pencarian gedung/bangunan
+   * (Fungsi setupSearchFocus dihapus karena sudah dimigrasikan ke js/components/search.js)
    */
-  setupSearchFocus() {
-    const searchInput = this.elements.searchBuilding;
-    const resultsMenu = this.elements.searchResults;
-    if (!searchInput || !resultsMenu) return;
-
-    searchInput.addEventListener('input', () => {
-      if (searchInput.value.trim() !== '') {
-        resultsMenu.innerHTML = `<li><a class="cursor-pointer">📍 Hasil simulasi pencarian terpusat</a></li>`;
-        resultsMenu.classList.remove('hidden');
-      } else {
-        resultsMenu.classList.add('hidden');
-      }
-    });
-  },
 
   /**
    * Komponen alert toast pemberitahuan universal

@@ -126,10 +126,10 @@ export const wilkerstatSE2026 = {
 
   getStyle() {
     return {
-      color: '#4f46e5',
+      color: '#059669',
       weight: 2.5,
-      fillColor: '#818cf8',
-      fillOpacity: 0.15,
+      fillColor: '#a7f3d0',
+      fillOpacity: 0.25,
       dashArray: '3'
     };
   }

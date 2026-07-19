@@ -5,6 +5,8 @@ export const Store = {
   activePolygonData: null,
   activeHandler: null,
   filterMetadata: [],
+  activeBuildingData: [], // Menyimpan array objek layer bangunan yang sedang aktif
+
   
   // ==========================================
   // STATE BARU: Tempat menyimpan cache index filter
@@ -150,5 +152,107 @@ export const Store = {
     }
 
     return targetIndices;
+  },
+
+  /**
+   * ==========================================
+   * FUNGSI BARU: Membaca dan memvalidasi berkas bangunan (CSV/GeoJSON)
+   * ==========================================
+   */
+  processBuildingFile(file, targetSource) {
+    return new Promise((resolve, reject) => {
+      const handler = targetSource.handler;
+      const sourceRegistryName = targetSource.name;
+      const isCsv = file.name.toLowerCase().endsWith('.csv');
+      const isGeoJson = file.name.toLowerCase().endsWith('.geojson') || file.name.toLowerCase().endsWith('.json');
+
+      if (!isCsv && !isGeoJson) {
+        return reject('Format file tidak didukung. Gunakan CSV atau GeoJSON.');
+      }
+
+      const reader = new FileReader();
+      reader.onerror = () => reject('Gagal membaca file bangunan dari disk.');
+      reader.onload = (e) => {
+        try {
+          const text = e.target.result;
+          let parsedData = [];
+
+          if (isCsv) {
+            // PapaParse assumes it's available globally via CDN in index.html
+            const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+            if (result.errors.length && result.data.length === 0) {
+              return reject('Gagal parsing CSV: ' + result.errors[0].message);
+            }
+            parsedData = result.data;
+          } else {
+            const geojson = JSON.parse(text);
+            parsedData = geojson.features || [];
+          }
+
+          // Transform raw data ke konfigurasi Leaflet menggunakan handler
+          const fileType = isCsv ? 'csv' : 'geojson';
+          const points = [];
+          
+          parsedData.forEach(item => {
+            const config = handler.toLayerConfig(item, fileType);
+            const style = handler.getMarkerOptions(item, fileType);
+            
+            // Validasi koordinat
+            if (!isNaN(config.geometry.lat) && !isNaN(config.geometry.lng)) {
+              points.push({ config, style });
+            }
+          });
+
+          if (points.length === 0) {
+            return reject('Tidak ada data koordinat valid (latitude/longitude) yang ditemukan.');
+          }
+
+          const buildingLayerSet = {
+            id: 'bgn_' + Date.now(),
+            filename: file.name,
+            points: points,
+            handler: handler,
+            sourceName: sourceRegistryName || file.name // Added to identify source in UI
+          };
+
+          this.activeBuildingData.push(buildingLayerSet);
+          resolve(buildingLayerSet);
+        } catch (err) {
+          reject('Terjadi kesalahan saat memproses data bangunan: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    });
+  },
+
+  /**
+   * ==========================================
+   * FUNGSI BARU: Pencarian Titik Bangunan Lintas Layer
+   * ==========================================
+   */
+  searchBuildings(keyword) {
+    if (!keyword || keyword.trim() === '') return [];
+    const kw = keyword.toLowerCase().trim();
+    const results = [];
+
+    this.activeBuildingData.forEach(layerSet => {
+      const sourceName = layerSet.sourceName;
+      
+      layerSet.points.forEach((pt, index) => {
+        if (pt.config.searchKeyword && pt.config.searchKeyword.includes(kw)) {
+          results.push({
+            layerId: layerSet.id,
+            pointIndex: index, // Berguna jika butuh identifikasi presisi
+            title: pt.config.searchTitle || 'Tanpa Nama',
+            lat: pt.config.geometry.lat,
+            lng: pt.config.geometry.lng,
+            sourceName: sourceName,
+            popupHtml: pt.config.popupHtml // untuk trigger popup otomatis
+          });
+        }
+      });
+    });
+
+    return results;
   }
 };

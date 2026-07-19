@@ -6,7 +6,9 @@ export const MapEngine = {
   map: null,
   polygonLayerGroup: null,
   rawGeoJsonInstance: null,
-  polygonSnapshot: null, // Tambahan untuk caching array layer
+  polygonSnapshot: null, 
+  buildingLayerGroups: {}, // Menyimpan L.featureGroup masing-masing sumber bangunan
+  buildingSnapshots: {},   // Menyimpan array layer L.circleMarker titik mentah
   baseLayers: {},
   currentBaseLayer: null,
 
@@ -138,6 +140,178 @@ export const MapEngine = {
     if (visibleLayers.length > 0) {
       const group = L.featureGroup(visibleLayers);
       this.map.fitBounds(group.getBounds(), { padding: [20, 20] });
+    }
+
+    // Terapkan filter spasial ke titik bangunan (mengikuti polygon)
+    this.applySpatialFilter();
+  },
+
+  /**
+   * Merender titik bangunan dari Store
+   */
+  renderBuilding(buildingLayerSet) {
+    if (!this.map) return;
+    
+    const { id, points, handler } = buildingLayerSet;
+
+    // Jika layer ini sudah ada, hapus dulu untuk re-render
+    if (this.buildingLayerGroups[id]) {
+      this.map.removeLayer(this.buildingLayerGroups[id]);
+    }
+
+    const featureGroup = L.featureGroup().addTo(this.map);
+    this.buildingLayerGroups[id] = featureGroup;
+    this.buildingSnapshots[id] = [];
+
+    points.forEach(item => {
+      const { config, style } = item;
+      const marker = L.circleMarker([config.geometry.lat, config.geometry.lng], style);
+      marker.bindPopup(config.popupHtml);
+      
+      // Simpan reference latlng untuk keperluan filter spasial
+      marker.itemLatLng = L.latLng(config.geometry.lat, config.geometry.lng);
+
+      featureGroup.addLayer(marker);
+      this.buildingSnapshots[id].push(marker);
+    });
+
+    this.map.fitBounds(featureGroup.getBounds());
+  },
+
+  /**
+   * Menjalankan filter titik yang berada di dalam polygon yang terlihat (Point-in-Polygon)
+   */
+  applySpatialFilter() {
+    if (!this.polygonLayerGroup || this.polygonLayerGroup.getLayers().length === 0) {
+      // Jika tidak ada polygon, tampilkan semua titik utuh
+      for (const id in this.buildingLayerGroups) {
+        const group = this.buildingLayerGroups[id];
+        const snapshot = this.buildingSnapshots[id];
+        snapshot.forEach(marker => {
+          if (!group.hasLayer(marker)) group.addLayer(marker);
+        });
+      }
+      return;
+    }
+
+    // Jika ada polygon, filter titik
+    for (const id in this.buildingLayerGroups) {
+      const group = this.buildingLayerGroups[id];
+      const snapshot = this.buildingSnapshots[id];
+      
+      snapshot.forEach(marker => {
+        const isInside = this.isPointInPolygon(marker.itemLatLng, this.polygonLayerGroup);
+        if (isInside) {
+          if (!group.hasLayer(marker)) group.addLayer(marker);
+        } else {
+          if (group.hasLayer(marker)) group.removeLayer(marker);
+        }
+      });
+    }
+  },
+
+  /**
+   * Algoritma Ray-Casting Point-in-Polygon
+   */
+  isPointInPolygon(latlng, layerGroup) {
+    let inside = false;
+    layerGroup.eachLayer(layer => {
+      if (inside) return;
+      
+      // Optimasi dengan Bounding Box Leaflet (super cepat)
+      if (layer.getBounds && !layer.getBounds().contains(latlng)) return;
+
+      const pt = [latlng.lng, latlng.lat];
+      let polygons = [];
+      if (layer.feature.geometry.type === 'Polygon') {
+        polygons = [layer.feature.geometry.coordinates];
+      } else if (layer.feature.geometry.type === 'MultiPolygon') {
+        polygons = layer.feature.geometry.coordinates;
+      }
+      
+      for (const poly of polygons) {
+        if (inside) break;
+        const ring = poly[0]; 
+        let intersect = false;
+        
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+          const xi = ring[i][0], yi = ring[i][1];
+          const xj = ring[j][0], yj = ring[j][1];
+          if (((yi > pt[1]) != (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi)) {
+            intersect = !intersect;
+          }
+        }
+        
+        if (intersect) {
+          let inHole = false;
+          for (let k = 1; k < poly.length; k++) {
+            const hole = poly[k];
+            let intersectHole = false;
+            for (let i = 0, j = hole.length - 1; i < hole.length; j = i++) {
+              const xi = hole[i][0], yi = hole[i][1];
+              const xj = hole[j][0], yj = hole[j][1];
+              if (((yi > pt[1]) != (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi)) {
+                intersectHole = !intersectHole;
+              }
+            }
+            if (intersectHole) { inHole = true; break; }
+          }
+          if (!inHole) inside = true;
+        }
+      }
+    });
+    return inside;
+  },
+
+  /**
+   * ==========================================
+   * FUNGSI BARU: Interaksi "Point to Map"
+   * ==========================================
+   */
+  focusToBuilding(layerId, lat, lng, popupHtml) {
+    if (!this.map) return;
+    
+    const targetLatLng = L.latLng(lat, lng);
+    
+    // Zoom in dan pindah ke koordinat target dengan animasi
+    this.map.flyTo(targetLatLng, 19, {
+      animate: true,
+      duration: 1.5
+    });
+
+    // Cari marker fisik yang sesuai untuk membuka popup-nya
+    let foundMarker = null;
+    if (this.buildingSnapshots[layerId]) {
+      const markers = this.buildingSnapshots[layerId];
+      // Karena kita butuh marker spesifik, kita cocokkan koordinatnya
+      for (const marker of markers) {
+        if (marker.itemLatLng.equals(targetLatLng)) {
+          foundMarker = marker;
+          break;
+        }
+      }
+    }
+
+    // Jika marker ditemukan dan sedang tertutup (karena filter), tampilkan sementara?
+    // Tidak, pengguna meminta filter ter-reset saat awal dimuat. 
+    // Tapi jika titik tidak terlihat karena difilter, mungkin harus ditambah sementara.
+    if (foundMarker) {
+      const group = this.buildingLayerGroups[layerId];
+      if (!group.hasLayer(foundMarker)) {
+        group.addLayer(foundMarker);
+      }
+      // Tunggu flyTo selesai sebelum membuka popup
+      this.map.once('moveend', () => {
+        foundMarker.openPopup();
+      });
+    } else {
+      // Fallback jika layer hilang, buat popup sementara (jarang terjadi karena kita punya reference marker)
+      this.map.once('moveend', () => {
+        L.popup({ offset: L.point(0, -10) })
+          .setLatLng(targetLatLng)
+          .setContent(popupHtml)
+          .openOn(this.map);
+      });
     }
   }
 }
