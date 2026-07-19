@@ -59,6 +59,14 @@ export const UI = {
         sb.classList.remove('w-0', 'overflow-hidden', 'border-r-0');
         sb.classList.add('w-80');
       }
+
+      // PERBAIKAN BUG BLANK MAP: Beritahu Leaflet bahwa kontainer berubah ukuran
+      import('./map.js').then(({ MapEngine }) => {
+        // Berikan sedikit delay 150-300ms jika sidebar Anda menggunakan animasi transisi Tailwind
+        setTimeout(() => {
+          MapEngine.resize();
+        }, 200);
+      });
     };
 
     if (this.elements.btnToggleSidebar) this.elements.btnToggleSidebar.addEventListener('click', toggle);
@@ -69,13 +77,18 @@ export const UI = {
    * Mengatur perpindahan status tombol basemap aktif
    */
   setupBasemapToggle() {
-    const toggleActive = (activeBtn, inactiveBtn) => {
+    const toggleActive = (activeBtn, inactiveBtn, basemapType) => {
       activeBtn.classList.add('btn-active', 'btn-primary');
       inactiveBtn.classList.remove('btn-active', 'btn-primary');
+      
+      import('./map.js').then(({ MapEngine }) => {
+        MapEngine.switchBasemap(basemapType);
+      });
     };
+
     if (this.elements.btnOsm && this.elements.btnGoogle) {
-      this.elements.btnOsm.addEventListener('click', () => toggleActive(this.elements.btnOsm, this.elements.btnGoogle));
-      this.elements.btnGoogle.addEventListener('click', () => toggleActive(this.elements.btnGoogle, this.elements.btnOsm));
+      this.elements.btnOsm.addEventListener('click', () => toggleActive(this.elements.btnOsm, this.elements.btnGoogle, 'osm'));
+      this.elements.btnGoogle.addEventListener('click', () => toggleActive(this.elements.btnGoogle, this.elements.btnOsm, 'google'));
     }
   },
 
@@ -86,13 +99,14 @@ export const UI = {
     // 1. Trigger Modal Polygon dinamis dari Registry
     if (this.elements.btnTriggerPolygonModal) {
       this.elements.btnTriggerPolygonModal.addEventListener('click', () => {
-        const polygonOptions = getAllPolygonSources().map(src => ({ value: src.id, label: src.name }));
-        
         openSpatialModal({
-          title: 'Muat Poligon Wilayah',
-          options: polygonOptions,
-          accept: '.geojson,.json',
-          onProcess: (file, selectedSchema) => this.processPolygonFile(file, selectedSchema),
+          title: 'Load Polygon Wilayah',
+          dataType: 'polygon', 
+          accept: '.geojson, .json',
+          // PERBAIKAN BUG: Menggunakan arrow function agar konteks "this" merujuk ke objek UI, bukan objek Modal
+          onProcess: (file, schemaId) => {
+            this.processPolygonFile(file, schemaId);
+          },
           onError: (msg, type) => this.showToast(msg, type)
         });
       });
@@ -107,7 +121,10 @@ export const UI = {
           title: 'Muat Titik Bangunan',
           options: buildingOptions,
           accept: '.geojson,.json,.csv',
-          onProcess: (file, selectedSchema) => this.processBuildingFile(file, selectedSchema),
+          // PERBAIKAN BUG: Disamakan menggunakan arrow function yang aman
+          onProcess: (file, selectedSchema) => {
+            this.processBuildingFile(file, selectedSchema);
+          },
           onError: (msg, type) => this.showToast(msg, type)
         });
       });
@@ -120,33 +137,30 @@ export const UI = {
   processPolygonFile(file, schemaId) {
     this.showToast(`Membaca berkas ${file.name}...`, 'info');
     
-    const targetSource = getPolygonHandler(schemaId);
-    if (!targetSource) {
-      this.showToast('Skema poligon tidak terdaftar di sistem!', 'error');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const geojsonData = JSON.parse(e.target.result);
-        
-        // Menjalankan sidik jari struktur data via fungsi validate bawaan modul
-        if (targetSource.handler && typeof targetSource.handler.validate === 'function') {
-          const isValid = targetSource.handler.validate(geojsonData);
-          if (!isValid) {
-            this.showToast(`❌ Galat Struktur! Berkas tidak sesuai dengan format "${targetSource.name}".`, 'error');
-            return;
-          }
-        }
-        
-        this.showToast(`✔ Berkas berhasil diverifikasi dengan skema: ${targetSource.name}!`, 'success');
-        // TODO: Emisi atau panggil mapEngine.renderPolygon(geojsonData, targetSource.handler) di Fase 2
-      } catch (err) {
-        this.showToast('Gagal memproses berkas JSON/GeoJSON yang rusak.', 'error');
-      }
-    };
-    reader.readAsText(file);
+    // Panggil engine store untuk memvalidasi isi internal berkas
+    import('./store.js').then(({ Store }) => {
+      Store.processPolygonFile(file, schemaId)
+        .then(({ handler, filterMetadata }) => {
+          this.showToast(`✔ Berkas berhasil diverifikasi! Memulai rendering peta...`, 'success');
+          
+          // 1. Render data ke peta via MapEngine
+          import('./map.js').then(({ MapEngine }) => {
+            MapEngine.renderPolygon(Store.activePolygonData, handler);
+            
+            // 2. Render UI filter dinamis ke sidebar container
+            const filterContainer = document.getElementById('dynamic-filter-container');
+            if (filterContainer) {
+              handler.renderFilterUI(filterContainer, filterMetadata, (criteria) => {
+                // Aksi balik saat user memilih opsi filter di sidebar
+                MapEngine.applyPolygonFilter(criteria);
+              });
+            }
+          });
+        })
+        .catch((errMessage) => {
+          this.showToast(`❌ Galat Validasi: ${errMessage}`, 'error');
+        });
+    });
   },
 
   /**

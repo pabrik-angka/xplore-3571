@@ -20,18 +20,22 @@ xplore-3571/
 ├── manifest.json           # Manifes PWA untuk instalasi aplikasi
 ├── sw.js                   # Service Worker untuk manajemen cache & kapabilitas offline
 │
+├── components/             # lokasi include html ui
+│   ├── navbar.html
+│   └── sidebar.html
+│
 └── js/
     ├── app.js              # Entry Point: Orkestrator inisialisasi aplikasi
     ├── map.js              # Mesin GIS: Inisialisasi Peta, Layer Management, & Render Grafis
     ├── store.js            # Data Store: Fetching data (GeoJSON/CSV), Parser, & State Management
     ├── ui.js               # DOM Controller: Event Listener, Sinkronisasi State ke Komponen
-    ├── components/
-    │   ├── navbar.js
-    │   ├── drawer.js
-    │   ├── polygonModal.js
-    │   └── buildingsModal.js
+    ├── polygonRegistry.js  # Registry Pattern untuk spasial poligon
+    ├── sourceRegistry.js   # Registry Pattern untuk spasial titik bangunan
     │
-    └── map-modules/                <-- Khusus Modul Strategi Atribut Data
+    ├── components/         # lokasi include component dengan logic yang cukup kompleks
+    │   └── modal.js
+    │
+    └── map-modules/                <-- lokasi module spasial dinamis untuk poligon dan titik bangunan
         ├── wilkerstat-se2026.js
         ├── sourceAHandler.js
         ├── sourceBHandler.js
@@ -117,10 +121,10 @@ Desain mengedepankan **Lega Viewport** (ruang peta maksimal) dengan memanfaatkan
 
 Langkah pengerjaan akan dieksekusi secara bertahap untuk memastikan fondasi aplikasi stabil sebelum ditumpuk fitur baru:
 
-- [ ] **Fase 1**: Penulisan manifes PWA, `sw.js`, dan pembuatan struktur dasar `index.html` (Layout Drawer, Container Map, CSS DaisyUI).
-- [ ] **Fase 2**: Inisialisasi mesin GIS utama di `js/map.js` beserta konfigurasi dual base map dan penanganan batas zoom maksimal.
-- [ ] **Fase 3**: Pembuatan modul core data parser `js/store.js` yang mendukung pembacaan format `.geojson` dan `.csv`.
-- [ ] **Fase 4**: Implementasi arsitektur modul `js/map-modules/` untuk penanganan _Strategy Pattern_ multi-sumber data.
+- [ ] **Fase 1**: Refactor migrasi ke daisyUI.
+- [ ] **Fase 2**: load basemap.
+- [ ] **Fase 3**: Implementasi arsitektur modul `js/map-modules/` untuk penanganan _Strategy Pattern_ multi-sumber data, untuk polygon layer (load, filtering, tooltip/popup).
+- [ ] **Fase 4**: Implementasi arsitektur modul `js/map-modules/` untuk penanganan _Strategy Pattern_ multi-sumber data, untuk layer titik bangunan.
 - [ ] **Fase 5**: Pembuatan pengontrol interaksi UI di `js/ui.js` untuk mengakomodasi fitur pencarian lokal, penyaringan dinamis tingkat wilayah, dan sinkronisasi status PWA.
 
 ```

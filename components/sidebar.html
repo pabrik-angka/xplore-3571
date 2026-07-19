@@ -38,16 +38,9 @@
   <!-- 4. Dynamic Region Filter Segment -->
   <section class="flex flex-col gap-2 w-full">
     <span class="text-xs font-bold uppercase tracking-wider text-base-content/50">Filter Spasial Wilayah</span>
-    <div class="flex flex-col gap-2 w-full">
-      <select id="filter-prov" class="select select-bordered select-sm w-full" disabled>
-        <option value="">-- Provinsi --</option>
-      </select>
-      <select id="filter-kab" class="select select-bordered select-sm w-full" disabled>
-        <option value="">-- Kota / Kabupaten --</option>
-      </select>
-      <select id="filter-kec" class="select select-bordered select-sm w-full" disabled>
-        <option value="">-- Kecamatan --</option>
-      </select>
+    <!-- Ubah select statis menjadi kontainer dinamis -->
+    <div id="dynamic-filter-container" class="flex flex-col gap-2 w-full text-xs text-base-content/40 italic">
+      Belum ada data poligon yang dimuat.
     </div>
   </section>
 </div>

@@ -1,95 +1,143 @@
 // js/map.js
-const map = L.map('map', { zoomControl: false }).setView([-7.82, 112.02], 12);
+import { CONFIG } from './config.js';
+import { Store } from './store.js'; // Import store baru And
 
-// Letakkan kontrol zoom ke kanan bawah agar tidak tertutup drawer mobile view
-L.control.zoom({ position: 'bottomright' }).addTo(map);
+export const MapEngine = {
+  map: null,
+  polygonLayerGroup: null,
+  rawGeoJsonInstance: null,
+  polygonSnapshot: null, // Tambahan untuk caching array layer
+  baseLayers: {},
+  currentBaseLayer: null,
 
-const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19
-}).addTo(map);
+  /**
+   * Inisialisasi peta dasar kosongan di awal sesuai config
+   */
+  init(containerId) {
+    try {
+      if (this.map) return; 
 
-const googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-  maxNativeZoom: 19,
-  maxZoom: 22
-});
-
-const polygonGroup = L.featureGroup().addTo(map);
-const buildingsGroup = L.featureGroup().addTo(map);
-
-export function switchBaseMap(type) {
-  if (type === 'osm') {
-    map.removeLayer(googleHybrid);
-    map.addLayer(osm);
-  } else if (type === 'hybrid') {
-    map.removeLayer(osm);
-    map.addLayer(googleHybrid);
-  }
-}
-
-export function clearPolygonLayer() {
-  polygonGroup.clearLayers();
-}
-
-export function clearBuildingsLayer() {
-  buildingsGroup.clearLayers();
-}
-
-export function renderPolygon(geoJsonData, onEachFeatureCallback) {
-  try {
-    const geoLayer = L.geoJSON(geoJsonData, {
-      style: {
-        color: '#4f46e5',
-        weight: 1.5,
-        fillColor: '#818cf8',
-        fillOpacity: 0.2
-      },
-      onEachFeature: onEachFeatureCallback
-    });
-    geoLayer.addTo(polygonGroup);
-    if (polygonGroup.getLayers().length > 0) {
-      map.fitBounds(polygonGroup.getBounds(), { padding: [20, 20] });
-    }
-    return geoLayer;
-  } catch (error) {
-    console.error('[Map Module - renderPolygon Error]:', error);
-  }
-}
-
-export function renderPoints(layersConfig) {
-  try {
-    layersConfig.forEach(cfg => {
-      if (!cfg.geometry || !Number.isFinite(cfg.geometry.lat) || !Number.isFinite(cfg.geometry.lng)) return;
-      
-      const marker = L.circleMarker([cfg.geometry.lat, cfg.geometry.lng], {
-        radius: 6,
-        color: '#e11d48',
-        fillColor: '#fb7185',
-        fillOpacity: 0.85,
-        weight: 1
-      });
-      
-      if (cfg.tooltipHtml) {
-        marker.bindPopup(cfg.tooltipHtml);
+      // VALIDASI: Cek apakah elemen ada di DOM saat ini
+      const container = document.getElementById(containerId);
+      if (!container) {
+        console.warn(`[MapEngine - Cancelled]: Elemen dengan ID '${containerId}' tidak ditemukan di DOM. Penundaan inisialisasi dilakukan.`);
+        return false; // Kembalikan status gagal tanpa melempar hard error
       }
-      
-      marker._search_keyword = cfg.searchKeyword;
-      marker.addTo(buildingsGroup);
-    });
-    
-    if (buildingsGroup.getLayers().length > 0) {
-      map.fitBounds(buildingsGroup.getBounds(), { padding: [30, 30] });
+
+      const mapConfig = CONFIG.MAP;
+      this.map = L.map(containerId, { maxZoom: 22 }).setView(mapConfig.DEFAULT_CENTER, mapConfig.DEFAULT_ZOOM);
+
+      this.baseLayers.osm = L.tileLayer(mapConfig.TILE_LAYER, {
+        maxNativeZoom: 19,
+        maxZoom: 22, // Memungkinkan OSM direntangkan (auto-scale) hingga zoom 22
+        attribution: mapConfig.ATTRIBUTION
+      });
+
+      this.baseLayers.google = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        maxNativeZoom: 21,
+        maxZoom: 22,
+        attribution: '© Google Maps'
+      });
+
+      this.currentBaseLayer = this.baseLayers.osm;
+      this.currentBaseLayer.addTo(this.map);
+
+      this.polygonLayerGroup = L.featureGroup().addTo(this.map);
+      console.log('✔ Leaflet Map Engine initialized empty with configured center.');
+      return true; // Sukses
+    } catch (error) {
+      console.error('[MapEngine - init Error]:', error);
+      return false;
     }
-  } catch (error) {
-    console.error('[Map Module - renderPoints Error]:', error);
-  }
-}
+  },
 
-export function focusToLayer(bounds) {
-  if (bounds) {
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
-  }
-}
+  /**
+   * Memaksa Leaflet menghitung ulang ukuran kontainer agar tidak blank/abu-abu
+   */
+  resize() {
+    if (this.map) {
+      this.map.invalidateSize({ animate: true });
+    }
+  },
 
-export function getBuildingsGroup() {
-  return buildingsGroup;
+  /**
+   * Mengganti layer peta dasar secara real-time
+   */
+  switchBasemap(type) {
+    if (!this.map || !this.baseLayers[type]) return;
+    
+    this.map.removeLayer(this.currentBaseLayer);
+    this.currentBaseLayer = this.baseLayers[type];
+    this.currentBaseLayer.addTo(this.map);
+  },
+
+  /**
+   * Render koleksi GeoJSON penuh ke dalam peta dengan interaksi klik
+   */
+  renderPolygon(geojsonData, handlerStyle) {
+    if (!this.map || !this.polygonLayerGroup) return;
+    
+    this.polygonLayerGroup.clearLayers();
+
+    this.rawGeoJsonInstance = L.geoJSON(geojsonData, {
+      style: () => handlerStyle.getStyle(),
+      onEachFeature: (feature, layer) => {
+        if (feature.properties && feature.properties.tooltipHtml) {
+          // PERBAIKAN INTERAKSI: Menggunakan bindPopup agar informasi hanya muncul saat poligon diklik
+          layer.bindPopup(feature.properties.tooltipHtml, {
+            closeButton: true,
+            offset: L.point(0, -10)
+          });
+        }
+      }
+    });
+
+    // PERBAIKAN BUG PERFORMA & VISIBILITAS:
+    // Ekstrak array layer individu dari instance geojson ke snapshot
+    this.polygonSnapshot = this.rawGeoJsonInstance.getLayers().slice();
+
+    // Tambahkan masing-masing layer individu secara langsung ke polygonLayerGroup
+    // Jangan tambahkan rawGeoJsonInstance agar removeLayer berfungsi dengan benar.
+    this.polygonSnapshot.forEach(layer => {
+      this.polygonLayerGroup.addLayer(layer);
+    });
+
+    this.map.fitBounds(this.polygonLayerGroup.getBounds());
+  },
+
+  /**
+   * Menjalankan fungsi filter lokal leaflet
+   */
+  applyPolygonFilter(criteria) {
+    if (!this.polygonSnapshot) return;
+
+    // Dapatkan index target dari array filter [kec, desa, sls]
+    const path = [criteria.kec, criteria.desa, criteria.sls].filter(Boolean);
+    const targetIndices = Store.getTargetIndices(path);
+    const targetSet = new Set(targetIndices);
+
+    const visibleLayers = [];
+
+    // Iterasi layer berdasarkan array snapshot untuk akurasi add/remove individual
+    this.polygonSnapshot.forEach((layer) => {
+      const idx = layer.feature.properties._index;
+
+      if (targetSet.has(idx)) {
+        if (!this.polygonLayerGroup.hasLayer(layer)) {
+          this.polygonLayerGroup.addLayer(layer);
+        }
+        visibleLayers.push(layer);
+      } else {
+        if (this.polygonLayerGroup.hasLayer(layer)) {
+          this.polygonLayerGroup.removeLayer(layer);
+        }
+      }
+    });
+
+    // Fit bounds responsif
+    if (visibleLayers.length > 0) {
+      const group = L.featureGroup(visibleLayers);
+      this.map.fitBounds(group.getBounds(), { padding: [20, 20] });
+    }
+  }
 }

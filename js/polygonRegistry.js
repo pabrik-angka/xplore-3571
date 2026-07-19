@@ -1,24 +1,36 @@
 // js/polygonRegistry.js
 import { wilkerstatSE2026 } from '../map-modules/wilkerstat-se2026.js';
-import { wilayahTemplateHandler } from '../map-modules/wilayah-template.js';
+// import { modulLain } from '../map-modules/modul-lain.js'; <-- jika ada modul baru besok-besok
 
-const polygonRegistry = {
-  'wilkerstat-se2026': {
-    name: "Wilkerstat SE2026 (Kec -> Kel -> SLS)",
-    handler: wilkerstatSE2026,
-    maxDepth: 'sls'
-  },
-  'template-blank-wilayah': {
-    name: "Template Blank Wilayah GeoJSON",
-    handler: wilayahTemplateHandler,
-    maxDepth: 'sls'
+// Objek penampung utama
+const polygonRegistry = {};
+
+/**
+ * Mendaftarkan handler polygon secara dinamis
+ * @param {Object} module Config object dari spatial module
+ */
+export function registerPolygon(module) {
+  try {
+    if (!module || !module.id || !module.name) {
+      throw new Error("Modul harus memiliki properti 'id' dan 'name'.");
+    }
+    polygonRegistry[module.id] = module;
+  } catch (error) {
+    console.error('[polygonRegistry - registerPolygon Error]:', error);
   }
-};
+}
+
+// LAKUKAN REGISTRASI DI SINI SECARA BERURUTAN (Aman dari circular dependency)
+registerPolygon(wilkerstatSE2026);
 
 export function getPolygonHandler(id) {
   return polygonRegistry[id] || null;
 }
 
 export function getAllPolygonSources() {
-  return Object.entries(polygonRegistry).map(([id, item]) => ({ id, name: item.name }));
+  return Object.entries(polygonRegistry).map(([id, item]) => ({ 
+    id, 
+    name: item.name,
+    maxDepth: item.maxDepth 
+  }));
 }

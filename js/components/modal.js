@@ -1,10 +1,32 @@
+// js/components/modal.js
+import { getAllPolygonSources } from '../polygonRegistry.js';
+// Impor dari sourceRegistry (pastikan fungsinya sudah ada atau disiapkan di file sourceRegistry.js Anda)
+// import { getAllBuildingSources } from '../sourceRegistry.js'; 
+
 /**
  * Xplore 3571 - Spatial Modal Component
+ * @param {Object} config Configuration object
+ * @param {string} config.title Judul Modal
+ * @param {string} config.dataType Jenis data untuk dibaca dari registry ('polygon' atau 'building')
+ * @param {Array} [config.options] Opsi manual (jika tidak menggunakan dataType dari registry)
+ * @param {string} config.accept Ekstensi berkas yang diterima (e.g. '.geojson,.csv')
+ * @param {Function} config.onProcess Callback sukses
+ * @param {Function} config.onError Callback error / validasi
  */
-// PASTIKAN ADA KATA 'export' DI DEPAN 'function'
-export function openSpatialModal({ title, options, accept, onProcess, onError }) {
+export function openSpatialModal({ title, dataType, options, accept, onProcess, onError }) {
   const modalContainer = document.getElementById('modal-container');
   if (!modalContainer) return;
+
+  // Resolusi otomatis daftar opsi dari Registry jika parameter dataType diberikan
+  let selectOptions = options || [];
+  
+  if (dataType === 'polygon') {
+    selectOptions = getAllPolygonSources().map(src => ({ value: src.id, label: src.name }));
+  } else if (dataType === 'building') {
+    // Jalankan jika sourceRegistry sudah siap
+    // selectOptions = getAllBuildingSources().map(src => ({ value: src.id, label: src.name }));
+    selectOptions = []; 
+  }
 
   modalContainer.innerHTML = `
     <dialog id="spatial-dialog" class="modal modal-open">
@@ -16,7 +38,7 @@ export function openSpatialModal({ title, options, accept, onProcess, onError })
             <label class="label"><span class="label-text font-semibold">1. Pilih Jenis Format Skema Data</span></label>
             <select id="modal-schema-select" class="select select-bordered select-sm w-full">
               <option value="" disabled selected>Pilih Skema...</option>
-              ${options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('')}
+              ${selectOptions.map(opt => `<option value="${opt.value}">${opt.value === 'wilkerstat-se2026' ? '⭐ ' : ''}${opt.label}</option>`).join('')}
             </select>
           </div>
 
