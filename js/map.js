@@ -154,28 +154,93 @@ export const MapEngine = {
     
     const { id, points, handler } = buildingLayerSet;
 
-    // Jika layer ini sudah ada, hapus dulu untuk re-render
+    // Bersihkan layer jika re-render
     if (this.buildingLayerGroups[id]) {
-      this.map.removeLayer(this.buildingLayerGroups[id]);
+      if (this.buildingLayerGroups[id] instanceof L.LayerGroup) {
+        this.map.removeLayer(this.buildingLayerGroups[id]);
+      } else {
+        Object.values(this.buildingLayerGroups[id]).forEach(g => this.map.removeLayer(g));
+      }
+    }
+    if (this.layerControls && this.layerControls[id]) {
+      this.map.removeControl(this.layerControls[id]);
+    }
+    if (this.legendControls && this.legendControls[id]) {
+      this.map.removeControl(this.legendControls[id]);
     }
 
-    const featureGroup = L.featureGroup().addTo(this.map);
-    this.buildingLayerGroups[id] = featureGroup;
     this.buildingSnapshots[id] = [];
+    let mainBounds = L.latLngBounds();
 
-    points.forEach(item => {
-      const { config, style } = item;
-      const marker = L.circleMarker([config.geometry.lat, config.geometry.lng], style);
-      marker.bindPopup(config.popupHtml);
-      
-      // Simpan reference latlng untuk keperluan filter spasial
-      marker.itemLatLng = L.latLng(config.geometry.lat, config.geometry.lng);
+    const hasSubcategory = points.some(p => p.config.subcategory);
 
-      featureGroup.addLayer(marker);
-      this.buildingSnapshots[id].push(marker);
-    });
+    if (hasSubcategory) {
+      this.buildingLayerGroups[id] = {};
+      const overlays = {};
+      const subCatColors = {};
 
-    this.map.fitBounds(featureGroup.getBounds());
+      points.forEach(item => {
+        const { config, style } = item;
+        const subCat = config.subcategory || 'Lainnya';
+        
+        if (!this.buildingLayerGroups[id][subCat]) {
+          this.buildingLayerGroups[id][subCat] = L.featureGroup().addTo(this.map);
+          overlays[subCat] = this.buildingLayerGroups[id][subCat];
+          subCatColors[subCat] = style.fillColor || style.color || '#cccccc';
+        }
+
+        const marker = L.circleMarker([config.geometry.lat, config.geometry.lng], style);
+        marker.bindPopup(config.popupHtml);
+        marker.itemLatLng = L.latLng(config.geometry.lat, config.geometry.lng);
+        marker.targetGroup = this.buildingLayerGroups[id][subCat];
+        marker.targetGroup.addLayer(marker);
+
+        mainBounds.extend(marker.itemLatLng);
+        this.buildingSnapshots[id].push(marker);
+      });
+
+      if (!this.layerControls) this.layerControls = {};
+      this.layerControls[id] = L.control.layers(null, overlays, { position: 'bottomright', collapsed: false }).addTo(this.map);
+
+      // Tambahkan Legend Control
+      if (!this.legendControls) this.legendControls = {};
+      const legend = L.control({ position: 'bottomright' });
+      legend.onAdd = function (map) {
+        const div = L.DomUtil.create('div', 'info legend bg-base-100/95 backdrop-blur shadow-lg p-3 rounded-lg border border-base-200 text-xs mt-2');
+        let html = '<h4 class="font-bold mb-2 border-b border-base-200 pb-1 text-base-content/80">Legenda</h4>';
+        for (const cat in subCatColors) {
+          html += `
+            <div class="flex items-center gap-2 mb-1.5 last:mb-0">
+              <span class="inline-block w-3 h-3 rounded-full border border-base-content/20 shadow-sm" style="background-color: ${subCatColors[cat]}"></span>
+              <span class="text-base-content/90 font-medium">${cat}</span>
+            </div>
+          `;
+        }
+        div.innerHTML = html;
+        return div;
+      };
+      this.legendControls[id] = legend.addTo(this.map);
+
+    } else {
+      const featureGroup = L.featureGroup().addTo(this.map);
+      this.buildingLayerGroups[id] = featureGroup;
+
+      points.forEach(item => {
+        const { config, style } = item;
+        const marker = L.circleMarker([config.geometry.lat, config.geometry.lng], style);
+        marker.bindPopup(config.popupHtml);
+        marker.itemLatLng = L.latLng(config.geometry.lat, config.geometry.lng);
+        marker.targetGroup = featureGroup;
+        marker.targetGroup.addLayer(marker);
+
+        mainBounds.extend(marker.itemLatLng);
+        this.buildingSnapshots[id].push(marker);
+      });
+    }
+
+    if (mainBounds.isValid()) {
+      this.map.fitBounds(mainBounds);
+    }
   },
 
   /**
@@ -184,27 +249,25 @@ export const MapEngine = {
   applySpatialFilter() {
     if (!this.polygonLayerGroup || this.polygonLayerGroup.getLayers().length === 0) {
       // Jika tidak ada polygon, tampilkan semua titik utuh
-      for (const id in this.buildingLayerGroups) {
-        const group = this.buildingLayerGroups[id];
+      for (const id in this.buildingSnapshots) {
         const snapshot = this.buildingSnapshots[id];
         snapshot.forEach(marker => {
-          if (!group.hasLayer(marker)) group.addLayer(marker);
+          if (!marker.targetGroup.hasLayer(marker)) marker.targetGroup.addLayer(marker);
         });
       }
       return;
     }
 
     // Jika ada polygon, filter titik
-    for (const id in this.buildingLayerGroups) {
-      const group = this.buildingLayerGroups[id];
+    for (const id in this.buildingSnapshots) {
       const snapshot = this.buildingSnapshots[id];
       
       snapshot.forEach(marker => {
         const isInside = this.isPointInPolygon(marker.itemLatLng, this.polygonLayerGroup);
         if (isInside) {
-          if (!group.hasLayer(marker)) group.addLayer(marker);
+          if (!marker.targetGroup.hasLayer(marker)) marker.targetGroup.addLayer(marker);
         } else {
-          if (group.hasLayer(marker)) group.removeLayer(marker);
+          if (marker.targetGroup.hasLayer(marker)) marker.targetGroup.removeLayer(marker);
         }
       });
     }
@@ -296,7 +359,7 @@ export const MapEngine = {
     // Tidak, pengguna meminta filter ter-reset saat awal dimuat. 
     // Tapi jika titik tidak terlihat karena difilter, mungkin harus ditambah sementara.
     if (foundMarker) {
-      const group = this.buildingLayerGroups[layerId];
+      const group = foundMarker.targetGroup;
       if (!group.hasLayer(foundMarker)) {
         group.addLayer(foundMarker);
       }

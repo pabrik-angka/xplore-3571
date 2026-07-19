@@ -2,6 +2,7 @@
 // import { bangunanTemplateHandler } from '../map-modules/bangunan-template.js';
 import { sentraEkonomiHandler } from '../map-modules/sentra-ekonomi.js';
 import { usahaSuplemenHandler } from '../map-modules/usaha-suplemen.js';
+import { FasihSE2026 } from '../map-modules/fasih-se2026.js';
 
 const registry = {
   'template-blank-bangunan': {
@@ -11,6 +12,10 @@ const registry = {
   'sentra-ekonomi': { 
     name: "Sentra Ekonomi (SWMAPS)", 
     handler: sentraEkonomiHandler 
+  },
+  'fasih-se2026': {
+    name: FasihSE2026.name,
+    handler: FasihSE2026
   }
 };
 
