@@ -76,12 +76,8 @@ export const MapEngine = {
       this.currentBaseLayer = this.baseLayers.osm;
       this.currentBaseLayer.addTo(this.map);
 
-      // Create a dedicated pane for buildings to keep them on top of polygons
-      this.map.createPane('buildingPane');
-      this.map.getPane('buildingPane').style.zIndex = '450';
-
       this.polygonLayerGroup = L.featureGroup().addTo(this.map);
-      this.canvasRenderer = L.canvas({ padding: 0.5, pane: 'buildingPane' });
+      this.canvasRenderer = L.canvas({ padding: 0.5 });
       
       // Initialize single global layer control and active legend registry
       this.layerControl = L.control.layers(null, null, { position: 'bottomright', collapsed: false }).addTo(this.map);
@@ -124,6 +120,7 @@ export const MapEngine = {
     this.polygonLayerGroup.clearLayers();
 
     this.rawGeoJsonInstance = L.geoJSON(geojsonData, {
+      renderer: this.canvasRenderer,
       style: () => handlerStyle.getStyle(),
       onEachFeature: (feature, layer) => {
         if (feature.properties && feature.properties.tooltipHtml) {
@@ -147,6 +144,9 @@ export const MapEngine = {
     });
 
     this.map.fitBounds(this.polygonLayerGroup.getBounds());
+    
+    // Pastikan titik bangunan digambar di atas polygon pada canvas
+    this.bringBuildingsToFront();
   },
 
   /**
@@ -186,6 +186,9 @@ export const MapEngine = {
 
     // Terapkan filter spasial ke titik bangunan (mengikuti polygon)
     this.applySpatialFilter();
+    
+    // Pastikan titik bangunan digambar di atas polygon pada canvas setelah pemfilteran
+    this.bringBuildingsToFront();
   },
 
   /**
@@ -282,6 +285,9 @@ export const MapEngine = {
 
     // Perbarui Tampilan Legenda Global
     this.updateLegend();
+    
+    // Pastikan titik bangunan digambar di atas polygon pada canvas setelah ditambahkan
+    this.bringBuildingsToFront();
 
     if (mainBounds.isValid()) {
       this.map.fitBounds(mainBounds);
@@ -461,6 +467,26 @@ export const MapEngine = {
       container.style.display = 'block';
     } else {
       container.style.display = 'none';
+    }
+  },
+
+  /**
+   * Mengatur antrean gambar (drawing queue) pada Canvas agar semua marker berada di atas polygon
+   */
+  bringBuildingsToFront() {
+    for (const id in this.buildingLayerGroups) {
+      const group = this.buildingLayerGroups[id];
+      if (group) {
+        if (group instanceof L.LayerGroup) {
+          group.bringToFront();
+        } else {
+          Object.values(group).forEach(g => {
+            if (g && typeof g.bringToFront === 'function') {
+              g.bringToFront();
+            }
+          });
+        }
+      }
     }
   }
 }
