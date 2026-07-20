@@ -27,10 +27,10 @@ export const FasihSE2026 = {
 
     let fillColor = '#64748b'; // Default abu-abu
     switch (keterangan) {
-      case "Prelist Usaha - Berusaha": fillColor = "#22c55e"; break; // hijau
+      case "Prelist Usaha - Berusaha": fillColor = "#FFFF00"; break; // hijau FFFF00
       case "Prelist Usaha - 0 Usaha": fillColor = "#ef4444"; break; // merah
       case "Prelist Keluarga - Berusaha": fillColor = "#3b82f6"; break; // biru
-      case "Prelist Keluarga - 0 Usaha": fillColor = "#f59e0b"; break; // orange
+      case "Prelist Keluarga - 0 Usaha": fillColor = "#f59e0b"; break; // orange f59e0b
       case "Assign Baru - Berusaha": fillColor = "#8b5cf6"; break; // ungu
       case "Assign Baru - 0 Usaha": fillColor = "#ec4899"; break; // pink
     }
@@ -89,6 +89,8 @@ export const FasihSE2026 = {
         <strong>is_ditemukan:</strong> ${p["is_ditemukan"]}<br>
         <strong>is_prelist:</strong> ${p["is_prelist"]}<br>
         <strong>is_prelist_usaha:</strong> ${p["is_prelist_usaha"]}<br>
+        <hr class="my-1 border-base-content/30 border-dashed">
+        <strong>Sumber:</strong> FasihSM SE2026<br>
       </div>
     `;
 

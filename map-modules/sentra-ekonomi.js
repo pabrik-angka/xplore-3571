@@ -37,6 +37,10 @@ export const sentraEkonomiHandler = {
           <div><span class="text-base-content/60 font-medium">Sektor:</span> <span class="font-semibold">${sektor}</span></div>
         </div>
         <div class="border-t border-base-300 my-2"></div>
+        <div class="space-y-1 mt-1">
+          <div><span class="text-base-content/60 font-medium">Sumber:</span> <span class="font-semibold">Sentra Ekonomi (SWMAPS)</span></div>
+        </div>
+        <div class="border-t border-base-300 my-1"></div>
         <div class="text-center">
           <a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" target="_blank" class="text-blue-600 hover:underline font-medium">
             Buka di Google Maps
