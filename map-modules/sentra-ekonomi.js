@@ -56,6 +56,7 @@ export const sentraEkonomiHandler = {
       popupHtml: popupHtml,
       searchKeyword: searchKeyword,
       searchTitle: namaUsaha,
+      subcategory: 'Sentra Ekonomi (SWMAPS)',
       originalData: p // simpan untuk keperluan filter spasial (opsional)
     };
   },

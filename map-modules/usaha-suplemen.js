@@ -56,6 +56,7 @@ export const usahaSuplemenHandler = {
       popupHtml: popupHtml,
       searchKeyword: searchKeyword,
       searchTitle: namaUsaha,
+      subcategory: 'Usaha Suplemen (KDM)',
       originalData: p // simpan untuk keperluan filter spasial (opsional)
     };
   },
@@ -64,7 +65,7 @@ export const usahaSuplemenHandler = {
   getMarkerOptions(rawItem, fileType = 'csv') {
     return {
       radius: 6,
-      fillColor: '#37b26c', // Orange seragam
+      fillColor: '#37b26c', // Hijau seragam
       color: '#ffffff',
       weight: 1.5,
       opacity: 1,

@@ -138,7 +138,7 @@ export const UI = {
    * Pemrosesan validasi internal berkas polygon
    */
   processPolygonFile(file, schemaId) {
-    this.showToast(`Membaca berkas ${file.name}...`, 'info');
+    this.showLoading(true, `Membaca berkas ${file.name}...`);
     
     // Panggil engine store untuk memvalidasi isi internal berkas
     import('./store.js').then(({ Store }) => {
@@ -158,11 +158,19 @@ export const UI = {
                 MapEngine.applyPolygonFilter(criteria);
               });
             }
+            this.showLoading(false);
+          }).catch(err => {
+            this.showToast(`❌ Galat Render: ${err.message || err}`, 'error');
+            this.showLoading(false);
           });
         })
         .catch((errMessage) => {
           this.showToast(`❌ Galat Validasi: ${errMessage}`, 'error');
+          this.showLoading(false);
         });
+    }).catch(err => {
+      this.showToast(`❌ Galat Load Module: ${err.message || err}`, 'error');
+      this.showLoading(false);
     });
   },
 
@@ -170,11 +178,12 @@ export const UI = {
    * Pemrosesan awal berkas data bangunan
    */
   processBuildingFile(file, schemaId) {
-    this.showToast(`Membaca berkas bangunan ${file.name}...`, 'info');
+    this.showLoading(true, `Membaca berkas bangunan ${file.name}...`);
     
     const targetSource = getHandler(schemaId);
     if (!targetSource) {
       this.showToast('Skema bangunan tidak terdaftar!', 'error');
+      this.showLoading(false);
       return;
     }
 
@@ -200,11 +209,19 @@ export const UI = {
             
             // 4. Panggil ulang applySpatialFilter memastikan state mengikuti polygon utuh
             MapEngine.applySpatialFilter();
+            this.showLoading(false);
+          }).catch(err => {
+            this.showToast(`❌ Galat Render Bangunan: ${err.message || err}`, 'error');
+            this.showLoading(false);
           });
         })
         .catch(err => {
           this.showToast(`❌ Galat Bangunan: ${err}`, 'error');
+          this.showLoading(false);
         });
+    }).catch(err => {
+      this.showToast(`❌ Galat Load Module: ${err.message || err}`, 'error');
+      this.showLoading(false);
     });
   },
 
@@ -252,5 +269,32 @@ export const UI = {
     `;
     document.body.appendChild(toastDiv);
     setTimeout(() => toastDiv.remove(), 4000);
+  },
+
+  /**
+   * Overlay loading modern berbasis glassmorphism & DaisyUI loading-infinity
+   */
+  showLoading(show = true, text = 'Memproses data spasial...') {
+    let overlay = document.getElementById('loading-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'loading-overlay';
+      overlay.className = 'fixed inset-0 bg-base-300/40 backdrop-blur-xs flex items-center justify-center z-[9999] transition-all duration-300 opacity-0 pointer-events-none';
+      overlay.innerHTML = `
+        <div class="bg-base-100/90 backdrop-blur p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-3 border border-base-200/50">
+          <span class="loading loading-infinity loading-lg text-primary"></span>
+          <span id="loading-text" class="text-sm font-semibold text-base-content/80"></span>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+    }
+    const textEl = overlay.querySelector('#loading-text');
+    if (textEl) textEl.textContent = text;
+
+    if (show) {
+      overlay.classList.remove('opacity-0', 'pointer-events-none');
+    } else {
+      overlay.classList.add('opacity-0', 'pointer-events-none');
+    }
   }
 };
