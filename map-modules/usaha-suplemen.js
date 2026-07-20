@@ -69,7 +69,8 @@ export const usahaSuplemenHandler = {
       color: '#ffffff',
       weight: 1.5,
       opacity: 1,
-      fillOpacity: 0.95
+      fillOpacity: 0.95,
+      shape: 'square'
     };
   }
 };

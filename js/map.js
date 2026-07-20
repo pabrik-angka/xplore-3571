@@ -1,6 +1,38 @@
 // js/map.js
 import { CONFIG } from './config.js';
-import { Store } from './store.js'; // Import store baru And
+import { Store } from './store.js';
+
+// Extend Leaflet's Canvas renderer to support drawing squares natively on canvas
+if (typeof L !== 'undefined' && L.Canvas) {
+  L.Canvas.include({
+    _updateCircle: function (layer) {
+      if (!this._drawing || layer._empty()) { return; }
+
+      var p = layer._point,
+          ctx = this._ctx,
+          r = Math.max(Math.round(layer._radius), 1),
+          s = (Math.max(Math.round(layer._radiusY), 1) || r) / r;
+
+      if (s !== 1) {
+        ctx.save();
+        ctx.scale(1, s);
+      }
+
+      ctx.beginPath();
+      if (layer.options.shape === 'square') {
+        ctx.rect(p.x - r, p.y / s - r, r * 2, r * 2);
+      } else {
+        ctx.arc(p.x, p.y / s, r, 0, Math.PI * 2, false);
+      }
+
+      if (s !== 1) {
+        ctx.restore();
+      }
+
+      this._fillStroke(ctx, layer);
+    }
+  });
+}
 
 export const MapEngine = {
   map: null,
@@ -44,7 +76,17 @@ export const MapEngine = {
       this.currentBaseLayer = this.baseLayers.osm;
       this.currentBaseLayer.addTo(this.map);
 
+      // Create a dedicated pane for buildings to keep them on top of polygons
+      this.map.createPane('buildingPane');
+      this.map.getPane('buildingPane').style.zIndex = '450';
+
       this.polygonLayerGroup = L.featureGroup().addTo(this.map);
+      this.canvasRenderer = L.canvas({ padding: 0.5, pane: 'buildingPane' });
+      
+      // Initialize single global layer control and active legend registry
+      this.layerControl = L.control.layers(null, null, { position: 'bottomright', collapsed: false }).addTo(this.map);
+      this.activeLegendItems = {};
+
       console.log('✔ Leaflet Map Engine initialized empty with configured center.');
       return true; // Sukses
     } catch (error) {
@@ -147,26 +189,28 @@ export const MapEngine = {
   },
 
   /**
-   * Merender titik bangunan dari Store
+   * Merender titik bangunan dari Store ke dalam satu Layer Control dan Legenda global
    */
   renderBuilding(buildingLayerSet) {
     if (!this.map) return;
     
-    const { id, points, handler } = buildingLayerSet;
+    const { id, points, sourceName } = buildingLayerSet;
 
-    // Bersihkan layer jika re-render
+    // Bersihkan layer lama jika re-render
     if (this.buildingLayerGroups[id]) {
       if (this.buildingLayerGroups[id] instanceof L.LayerGroup) {
         this.map.removeLayer(this.buildingLayerGroups[id]);
+        if (this.layerControl) this.layerControl.removeLayer(this.buildingLayerGroups[id]);
       } else {
-        Object.values(this.buildingLayerGroups[id]).forEach(g => this.map.removeLayer(g));
+        Object.values(this.buildingLayerGroups[id]).forEach(g => {
+          this.map.removeLayer(g);
+          if (this.layerControl) this.layerControl.removeLayer(g);
+        });
       }
+      delete this.buildingLayerGroups[id];
     }
-    if (this.layerControls && this.layerControls[id]) {
-      this.map.removeControl(this.layerControls[id]);
-    }
-    if (this.legendControls && this.legendControls[id]) {
-      this.map.removeControl(this.legendControls[id]);
+    if (this.activeLegendItems[id]) {
+      delete this.activeLegendItems[id];
     }
 
     this.buildingSnapshots[id] = [];
@@ -176,7 +220,6 @@ export const MapEngine = {
 
     if (hasSubcategory) {
       this.buildingLayerGroups[id] = {};
-      const overlays = {};
       const subCatColors = {};
 
       points.forEach(item => {
@@ -185,11 +228,16 @@ export const MapEngine = {
         
         if (!this.buildingLayerGroups[id][subCat]) {
           this.buildingLayerGroups[id][subCat] = L.featureGroup().addTo(this.map);
-          overlays[subCat] = this.buildingLayerGroups[id][subCat];
+          if (this.layerControl) {
+            this.layerControl.addOverlay(this.buildingLayerGroups[id][subCat], subCat);
+          }
           subCatColors[subCat] = style.fillColor || style.color || '#cccccc';
         }
 
-        const marker = L.circleMarker([config.geometry.lat, config.geometry.lng], style);
+        const marker = L.circleMarker([config.geometry.lat, config.geometry.lng], {
+          ...style,
+          renderer: this.canvasRenderer
+        });
         marker.bindPopup(config.popupHtml);
         marker.itemLatLng = L.latLng(config.geometry.lat, config.geometry.lng);
         marker.targetGroup = this.buildingLayerGroups[id][subCat];
@@ -199,35 +247,27 @@ export const MapEngine = {
         this.buildingSnapshots[id].push(marker);
       });
 
-      if (!this.layerControls) this.layerControls = {};
-      this.layerControls[id] = L.control.layers(null, overlays, { position: 'bottomright', collapsed: false }).addTo(this.map);
-
-      // Tambahkan Legend Control
-      if (!this.legendControls) this.legendControls = {};
-      const legend = L.control({ position: 'bottomright' });
-      legend.onAdd = function (map) {
-        const div = L.DomUtil.create('div', 'info legend bg-base-100/95 backdrop-blur shadow-lg p-3 rounded-lg border border-base-200 text-xs mt-2');
-        let html = '<h4 class="font-bold mb-2 border-b border-base-200 pb-1 text-base-content/80">Legenda</h4>';
-        for (const cat in subCatColors) {
-          html += `
-            <div class="flex items-center gap-2 mb-1.5 last:mb-0">
-              <span class="inline-block w-3 h-3 rounded-full border border-base-content/20 shadow-sm" style="background-color: ${subCatColors[cat]}"></span>
-              <span class="text-base-content/90 font-medium">${cat}</span>
-            </div>
-          `;
-        }
-        div.innerHTML = html;
-        return div;
-      };
-      this.legendControls[id] = legend.addTo(this.map);
+      this.activeLegendItems[id] = subCatColors;
 
     } else {
       const featureGroup = L.featureGroup().addTo(this.map);
       this.buildingLayerGroups[id] = featureGroup;
 
+      const layerLabel = sourceName || 'Titik Bangunan';
+      if (this.layerControl) {
+        this.layerControl.addOverlay(featureGroup, layerLabel);
+      }
+
+      let firstColor = '#cccccc';
       points.forEach(item => {
         const { config, style } = item;
-        const marker = L.circleMarker([config.geometry.lat, config.geometry.lng], style);
+        if (firstColor === '#cccccc') {
+          firstColor = style.fillColor || style.color || '#cccccc';
+        }
+        const marker = L.circleMarker([config.geometry.lat, config.geometry.lng], {
+          ...style,
+          renderer: this.canvasRenderer
+        });
         marker.bindPopup(config.popupHtml);
         marker.itemLatLng = L.latLng(config.geometry.lat, config.geometry.lng);
         marker.targetGroup = featureGroup;
@@ -236,7 +276,12 @@ export const MapEngine = {
         mainBounds.extend(marker.itemLatLng);
         this.buildingSnapshots[id].push(marker);
       });
+
+      this.activeLegendItems[id] = { [layerLabel]: firstColor };
     }
+
+    // Perbarui Tampilan Legenda Global
+    this.updateLegend();
 
     if (mainBounds.isValid()) {
       this.map.fitBounds(mainBounds);
@@ -375,6 +420,47 @@ export const MapEngine = {
           .setContent(popupHtml)
           .openOn(this.map);
       });
+    }
+  },
+
+  /**
+   * Memperbarui panel legenda global tunggal di pojok kanan bawah
+   */
+  updateLegend() {
+    if (!this.legendControl) {
+      this.legendControl = L.control({ position: 'bottomright' });
+      this.legendControl.onAdd = function (map) {
+        const div = L.DomUtil.create('div', 'info legend bg-base-100/95 backdrop-blur shadow-lg p-3 rounded-lg border border-base-200 text-xs mt-2 min-w-[180px]');
+        div.id = 'global-map-legend';
+        return div;
+      };
+      this.legendControl.addTo(this.map);
+    }
+
+    const container = document.getElementById('global-map-legend');
+    if (!container) return;
+
+    let html = '<h4 class="font-bold mb-2 border-b border-base-200 pb-1 text-base-content/80 text-sm">Legenda</h4>';
+    let hasItems = false;
+
+    for (const layerId in this.activeLegendItems) {
+      const items = this.activeLegendItems[layerId];
+      for (const cat in items) {
+        hasItems = true;
+        html += `
+          <div class="flex items-center gap-2 mb-1.5 last:mb-0">
+            <span class="inline-block w-3 h-3 rounded-full border border-base-content/20 shadow-sm" style="background-color: ${items[cat]}"></span>
+            <span class="text-base-content/90 font-medium">${cat}</span>
+          </div>
+        `;
+      }
+    }
+
+    if (hasItems) {
+      container.innerHTML = html;
+      container.style.display = 'block';
+    } else {
+      container.style.display = 'none';
     }
   }
 }
