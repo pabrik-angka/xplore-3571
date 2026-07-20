@@ -89,6 +89,7 @@ export const FasihSE2026 = {
         <strong>is_ditemukan:</strong> ${p["is_ditemukan"]}<br>
         <strong>is_prelist:</strong> ${p["is_prelist"]}<br>
         <strong>is_prelist_usaha:</strong> ${p["is_prelist_usaha"]}<br>
+        <a href="https://fasih-sm.bps.go.id/app/assignment-detail/${p["id"]}" target="_blank"><strong>link fasihsm</strong></a><br>
         <hr class="my-1 border-base-content/30 border-dashed">
         <strong>Sumber:</strong> FasihSM SE2026<br>
       </div>
