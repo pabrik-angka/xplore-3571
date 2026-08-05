@@ -1,7 +1,5 @@
 // js/components/modal.js
-import { getAllPolygonSources } from '../polygonRegistry.js';
-// Impor dari sourceRegistry (pastikan fungsinya sudah ada atau disiapkan di file sourceRegistry.js Anda)
-// import { getAllBuildingSources } from '../sourceRegistry.js'; 
+import { getAllPolygonSources, getAllBuildingSources } from '../moduleRegistry.js';
 
 /**
  * Xplore 3571 - Spatial Modal Component
@@ -19,17 +17,17 @@ export function openSpatialModal({ title, dataType, options, accept, onProcess, 
 
   // Resolusi otomatis daftar opsi dari Registry jika parameter dataType diberikan
   let selectOptions = options || [];
-  
+
   if (dataType === 'polygon') {
     selectOptions = getAllPolygonSources().map(src => ({ value: src.id, label: src.name }));
   } else if (dataType === 'building') {
     // Jalankan jika sourceRegistry sudah siap
     // selectOptions = getAllBuildingSources().map(src => ({ value: src.id, label: src.name }));
-    selectOptions = []; 
+    selectOptions = [];
   }
 
   modalContainer.innerHTML = `
-    <dialog id="spatial-dialog" class="modal modal-open">
+    <dialog id="spatial-dialog" class="modal">
       <div class="modal-box max-w-sm rounded-xl border border-base-300 shadow-2xl">
         <h3 class="font-bold text-lg text-secondary mb-4">📂 ${title}</h3>
         
@@ -53,13 +51,27 @@ export function openSpatialModal({ title, dataType, options, accept, onProcess, 
           <button id="modal-submit" class="btn btn-sm btn-primary cursor-pointer">Proses & Peta</button>
         </div>
       </div>
+      <form method="dialog" class="modal-backdrop">
+        <button id="modal-backdrop-close">close</button>
+      </form>
     </dialog>
   `;
 
   const dialog = document.getElementById('spatial-dialog');
+  if (dialog) {
+    dialog.showModal();
+  }
 
-  document.getElementById('modal-cancel').addEventListener('click', () => {
-    dialog.remove();
+  const closeDialog = () => {
+    dialog.close();
+    // Beri sedikit delay transisi sebelum dihapus dari DOM
+    setTimeout(() => dialog.remove(), 200);
+  };
+
+  document.getElementById('modal-cancel').addEventListener('click', closeDialog);
+  document.getElementById('modal-backdrop-close').addEventListener('click', (e) => {
+    e.preventDefault();
+    closeDialog();
   });
 
   document.getElementById('modal-submit').addEventListener('click', () => {
@@ -74,6 +86,6 @@ export function openSpatialModal({ title, dataType, options, accept, onProcess, 
     }
 
     onProcess(fileInput, schemaSelect);
-    dialog.remove();
+    closeDialog();
   });
 }

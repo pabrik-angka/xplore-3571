@@ -1,11 +1,17 @@
-// map-modules/wilkerstat-se2026.js
+// data-modules/wilkerstat-se2026.js
 import { Store } from '../js/store.js'; // Import Store untuk optimasi Tree Indexing
 
 export const wilkerstatSE2026 = {
   id: 'wilkerstat-se2026',
   name: "Wilkerstat SE2026",
   maxDepth: 'sls',
-  
+  type: 'polygon',
+
+  // Kapabilitas fitur modul — menentukan tombol FAB yang aktif
+  is_spatial_active: true,    // Ditampilkan di peta sebagai layer poligon
+  is_tabulasi_active: false,   // Properti/feature bisa dieksplorasi dalam tabel
+  is_dashboard_active: false, // Tidak ada visualisasi dashboard
+
   // Daftar field mandatori yang wajib ada di properti objek spasial
   mandatoryFields: ['idsubsls', 'kdkec', 'nmkec', 'kddesa', 'nmdesa', 'kdsls', 'nmsls', 'pml', 'ppl'],
 

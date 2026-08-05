@@ -1,13 +1,22 @@
-// map-modules/usaha-suplemen.js
+// data-modules/sentra-ekonomi.js
 
-export const usahaSuplemenHandler = {
+export const sentraEkonomiHandler = {
+  id: 'sentra-ekonomi',
+  name: 'Sentra Ekonomi (SWMAPS)',
+
+  // Kapabilitas fitur modul — menentukan tombol FAB yang aktif
+  is_spatial_active: true,    // Ditampilkan di peta sebagai titik marker
+  is_tabulasi_active: false,   // Data bisa dieksplorasi dalam tabel
+  is_dashboard_active: false, // Belum ada visualisasi dashboard
+  type: 'building',
+
   // 1. Definisikan informasi/field apa saja yang akan ditampilkan
   mandatoryFields: ['id', 'nama_usaha', 'deskripsi', 'sektor', 'latitude', 'longitude'],
-  
+
   // 2. Transformasi objek mentah ke standar konfigurasi Leaflet
   toLayerConfig(rawItem, fileType = 'csv') {
     const p = fileType === 'geojson' ? (rawItem.properties || {}) : rawItem;
-    
+
     // Pencarian case-insensitive untuk property
     const getProp = (keys) => {
       for (const key of keys) {
@@ -38,9 +47,9 @@ export const usahaSuplemenHandler = {
         </div>
         <div class="border-t border-base-300 my-2"></div>
         <div class="space-y-1 mt-1">
-          <div><span class="text-base-content/60 font-medium">Sumber:</span> <span class="font-semibold">Usaha Suplemen (KDM)</span></div>
+          <div><span class="text-base-content/60 font-medium">Sumber:</span> <span class="font-semibold">Sentra Ekonomi (SWMAPS)</span></div>
         </div>
-        <div class="border-t border-base-300 my-2"></div>        
+        <div class="border-t border-base-300 my-1"></div>
         <div class="text-center">
           <a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" target="_blank" class="text-blue-600 hover:underline font-medium">
             Buka di Google Maps
@@ -56,7 +65,7 @@ export const usahaSuplemenHandler = {
       popupHtml: popupHtml,
       searchKeyword: searchKeyword,
       searchTitle: namaUsaha,
-      subcategory: 'Usaha Suplemen (KDM)',
+      subcategory: 'Sentra Ekonomi (SWMAPS)',
       originalData: p // simpan untuk keperluan filter spasial (opsional)
     };
   },
@@ -65,7 +74,7 @@ export const usahaSuplemenHandler = {
   getMarkerOptions(rawItem, fileType = 'csv') {
     return {
       radius: 6,
-      fillColor: '#37b26c', // Hijau seragam
+      fillColor: '#f97316', // Orange seragam
       color: '#ffffff',
       weight: 1.5,
       opacity: 1,

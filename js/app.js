@@ -4,8 +4,8 @@
  */
 import { UI } from './ui.js';
 import { MapEngine } from './map.js';
+import { Router } from './router.js';
 import SpatialFilterManager from './spatialFilter.js';
-import { wilkerstatSE2026 } from '../map-modules/wilkerstat-se2026.js';
 
 async function loadComponent(containerId, filePath) {
   try {
@@ -27,12 +27,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadComponent('navbar-container', 'components/navbar.html'),
     loadComponent('sidebar-container', 'components/sidebar.html')
   ]);
-  
+
   console.log('✔ Seluruh fragmen UI masuk DOM.');
 
   // 2. Coba inisialisasi peta (pastikan ID di index.html Anda adalah 'map-container' atau 'map')
-  const isMapReady = MapEngine.init('map-container'); 
-  
+  const isMapReady = MapEngine.init('map-container');
+
   // Jika gagal dengan 'map-container', coba fallback ke ID 'map'
   if (!isMapReady) {
     MapEngine.init('map');
@@ -41,4 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 3. Bangun ulang cache element dan daftarkan Event Listener UI tetap berjalan
   UI.reCacheElements();
   UI.init();
+
+  // 4. Inisialisasi SPA Router
+  Router.init();
 });

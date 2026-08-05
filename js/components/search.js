@@ -97,9 +97,11 @@ export const SearchComponent = {
     // Pagination Footer (Absolute di bagian bawah list)
     listHtml += `
         <li class="absolute bottom-0 left-0 w-full p-2 bg-base-100/90 backdrop-blur border-t border-base-200 flex justify-between items-center rounded-b-box">
-          <button id="btn-search-prev" class="btn btn-xs btn-outline" ${this.currentPage === 1 ? 'disabled' : ''}>← Prev</button>
-          <span class="text-[10px] font-medium opacity-60">Hal ${this.currentPage} dari ${totalPages}</span>
-          <button id="btn-search-next" class="btn btn-xs btn-outline" ${this.currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}>Next →</button>
+          <div class="join">
+            <button id="btn-search-prev" class="btn btn-xs btn-outline join-item" ${this.currentPage === 1 ? 'disabled' : ''}>← Prev</button>
+            <button class="btn btn-xs btn-outline btn-active join-item pointer-events-none text-[10px] font-semibold">Hal ${this.currentPage} dari ${totalPages}</button>
+            <button id="btn-search-next" class="btn btn-xs btn-outline join-item" ${this.currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}>Next →</button>
+          </div>
         </li>
       </ul>
     `;

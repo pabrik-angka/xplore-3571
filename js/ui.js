@@ -1,8 +1,7 @@
 /**
  * Xplore 3571 - UI Management Module
  */
-import { getAllPolygonSources, getPolygonHandler } from './polygonRegistry.js';
-import { getAllBuildingSources, getHandler } from './sourceRegistry.js';
+import { getAllPolygonSources, getPolygonHandler, getAllBuildingSources, getHandler } from './moduleRegistry.js';
 import { SearchComponent } from './components/search.js';
 
 // component modal load file
@@ -25,6 +24,8 @@ export const UI = {
       
       btnTriggerPolygonModal: document.getElementById('btn-trigger-polygon-modal'),
       btnTriggerBuildingModal: document.getElementById('btn-trigger-building-modal'),
+      btnTriggerExploreModal: document.getElementById('btn-trigger-explore-modal'),
+      activeModulesList: document.getElementById('active-modules-list'),
       
       filterProv: document.getElementById('filter-prov'),
       filterKab: document.getElementById('filter-kab'),
@@ -42,6 +43,7 @@ export const UI = {
     this.setupBasemapToggle();
     this.setupModalTriggers();
     this.setupNetworkMonitoring();
+    this.setupActiveModulesListener();
     
     // Inisialisasi komponen pencarian
     SearchComponent.init();
@@ -132,6 +134,53 @@ export const UI = {
         });
       });
     }
+    // 3. Trigger Modal Explorasi Data (btn di sidebar Collapse 2)
+    if (this.elements.btnTriggerExploreModal) {
+      this.elements.btnTriggerExploreModal.addEventListener('click', () => {
+        // TODO: Buka modal explorasi tabulasi/data di iterasi berikutnya
+        this.showToast('Fitur Muat Data Modul akan segera hadir!', 'info');
+      });
+    }
+  },
+
+  /**
+   * Mendengarkan event 'app:modules-changed' dan merender ulang daftar modul aktif di sidebar.
+   * Pattern: passive reactive listener — tidak menyimpan state sendiri.
+   */
+  setupActiveModulesListener() {
+    document.addEventListener('app:modules-changed', (e) => {
+      const { modules } = e.detail;
+      this._renderActiveModulesList(modules);
+    });
+  },
+
+  /**
+   * Merender daftar <li> modul aktif ke dalam #active-modules-list di sidebar.
+   * @param {Array} modules - Array dari ModuleManager.getActiveModules()
+   */
+  _renderActiveModulesList(modules) {
+    const list = document.getElementById('active-modules-list');
+    if (!list) return;
+
+    if (!modules || modules.length === 0) {
+      list.innerHTML = `
+        <li>
+          <span id="active-modules-empty" class="text-xs text-base-content/40 italic pl-2">
+            Belum ada modul yang dimuat.
+          </span>
+        </li>
+      `;
+      return;
+    }
+
+    const typeIcon = { building: '📍', polygon: '🔷', unknown: '📦' };
+    list.innerHTML = modules.map(m => `
+      <li>
+        <a class="text-xs gap-1" title="Modul: ${m.id}">
+          ${typeIcon[m.type] || typeIcon.unknown} ${m.name}
+        </a>
+      </li>
+    `).join('');
   },
 
   /**
@@ -146,23 +195,17 @@ export const UI = {
         .then(({ handler, filterMetadata }) => {
           this.showToast(`✔ Berkas berhasil diverifikasi! Memulai rendering peta...`, 'success');
           
-          // 1. Render data ke peta via MapEngine
-          import('./map.js').then(({ MapEngine }) => {
-            MapEngine.renderPolygon(Store.activePolygonData, handler);
-            
-            // 2. Render UI filter dinamis ke sidebar container
-            const filterContainer = document.getElementById('dynamic-filter-container');
-            if (filterContainer) {
+          // Render UI filter dinamis ke sidebar container
+          const filterContainer = document.getElementById('dynamic-filter-container');
+          if (filterContainer) {
+            import('./map.js').then(({ MapEngine }) => {
               handler.renderFilterUI(filterContainer, filterMetadata, (criteria) => {
                 // Aksi balik saat user memilih opsi filter di sidebar
                 MapEngine.applyPolygonFilter(criteria);
               });
-            }
-            this.showLoading(false);
-          }).catch(err => {
-            this.showToast(`❌ Galat Render: ${err.message || err}`, 'error');
-            this.showLoading(false);
-          });
+            });
+          }
+          this.showLoading(false);
         })
         .catch((errMessage) => {
           this.showToast(`❌ Galat Validasi: ${errMessage}`, 'error');
@@ -203,15 +246,12 @@ export const UI = {
 
             // 2. Terapkan filter kosong (reset) ke peta agar seluruh polygon muncul utuh
             MapEngine.applyPolygonFilter({ kec: '', desa: '', sls: '' });
-
-            // 3. Render file bangunan ke peta (MapEngine akan memasukkan titik & memanggil applySpatialFilter)
-            MapEngine.renderBuilding(buildingLayerSet);
             
-            // 4. Panggil ulang applySpatialFilter memastikan state mengikuti polygon utuh
+            // 3. Panggil ulang applySpatialFilter memastikan state mengikuti polygon utuh
             MapEngine.applySpatialFilter();
             this.showLoading(false);
           }).catch(err => {
-            this.showToast(`❌ Galat Render Bangunan: ${err.message || err}`, 'error');
+            this.showToast(`❌ Galat Filter Spasial: ${err.message || err}`, 'error');
             this.showLoading(false);
           });
         })
@@ -247,7 +287,7 @@ export const UI = {
    */
 
   /**
-   * Komponen alert toast pemberitahuan universal
+   * Komponen alert toast pemberitahuan universal (Posisi Kanan Atas / top-end)
    */
   showToast(message, type = 'info') {
     const existingToast = document.querySelector('.toast-container');
@@ -261,7 +301,7 @@ export const UI = {
     };
 
     const toastDiv = document.createElement('div');
-    toastDiv.className = 'toast toast-end toast-bottom z-[9999] toast-container';
+    toastDiv.className = 'toast toast-end toast-top z-[9999] toast-container mt-16'; // mt-16 agar tidak terhalang navbar jika ada
     toastDiv.innerHTML = `
       <div class="alert ${alertClasses[type]} shadow-lg text-sm font-medium">
         <span>${message}</span>
@@ -272,29 +312,35 @@ export const UI = {
   },
 
   /**
-   * Overlay loading modern berbasis glassmorphism & DaisyUI loading-infinity
+   * Toast Loading dengan indikator progress (Posisi Kanan Atas / top-end)
    */
   showLoading(show = true, text = 'Memproses data spasial...') {
-    let overlay = document.getElementById('loading-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'loading-overlay';
-      overlay.className = 'fixed inset-0 bg-base-300/40 backdrop-blur-xs flex items-center justify-center z-[9999] transition-all duration-300 opacity-0 pointer-events-none';
-      overlay.innerHTML = `
-        <div class="bg-base-100/90 backdrop-blur p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-3 border border-base-200/50">
-          <span class="loading loading-infinity loading-lg text-primary"></span>
-          <span id="loading-text" class="text-sm font-semibold text-base-content/80"></span>
+    let loadingToast = document.getElementById('loading-toast');
+    
+    if (!show) {
+      if (loadingToast) {
+        loadingToast.remove();
+      }
+      return;
+    }
+
+    if (!loadingToast) {
+      loadingToast = document.createElement('div');
+      loadingToast.id = 'loading-toast';
+      loadingToast.className = 'toast toast-end toast-top z-[9999] mt-16';
+      loadingToast.innerHTML = `
+        <div class="alert alert-info shadow-xl text-sm font-medium flex flex-col items-start gap-2 min-w-[280px]">
+          <div class="flex items-center gap-2">
+            <span class="loading loading-spinner loading-xs text-primary"></span>
+            <span id="loading-toast-text">${text}</span>
+          </div>
+          <progress class="progress progress-primary w-full h-1"></progress>
         </div>
       `;
-      document.body.appendChild(overlay);
-    }
-    const textEl = overlay.querySelector('#loading-text');
-    if (textEl) textEl.textContent = text;
-
-    if (show) {
-      overlay.classList.remove('opacity-0', 'pointer-events-none');
+      document.body.appendChild(loadingToast);
     } else {
-      overlay.classList.add('opacity-0', 'pointer-events-none');
+      const textEl = loadingToast.querySelector('#loading-toast-text');
+      if (textEl) textEl.textContent = text;
     }
   }
 };

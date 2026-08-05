@@ -1,5 +1,5 @@
 // js/store.js
-import { getPolygonHandler } from './polygonRegistry.js';
+import { getPolygonHandler } from './moduleRegistry.js';
 
 export const Store = {
   activePolygonData: null,
@@ -85,10 +85,18 @@ export const Store = {
           this.activeHandler = handler;
           this.filterMetadata = processedFeatures.map(f => f.properties.filterData);
 
+          // Pemicu Custom Event untuk update spasial / UI reaktif
+          document.dispatchEvent(new CustomEvent('app:polygon-changed', {
+            detail: {
+              polygonData: this.activePolygonData,
+              handler: this.activeHandler,
+              filterMetadata: this.filterMetadata
+            }
+          }));
+
           resolve({
             handler: this.activeHandler,
             filterMetadata: this.filterMetadata,
-            // Kembalikan data index tree ke UI jika dibutuhkan
             filterIndexTree: this.filterIndexTree 
           });
         } catch (err) {
@@ -216,6 +224,14 @@ export const Store = {
           };
 
           this.activeBuildingData.push(buildingLayerSet);
+
+          // Pemicu Custom Event untuk update spasial / UI reaktif
+          document.dispatchEvent(new CustomEvent('app:buildings-changed', {
+            detail: {
+              buildingLayerSet: buildingLayerSet
+            }
+          }));
+
           resolve(buildingLayerSet);
         } catch (err) {
           reject('Terjadi kesalahan saat memproses data bangunan: ' + err.message);

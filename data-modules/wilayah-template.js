@@ -1,6 +1,12 @@
-// map-modules/wilayah-blank-template.js
+// data-modules/wilayah-blank-template.js
 
 export const wilayahTemplateHandler = {
+  // Kapabilitas fitur modul — menentukan tombol FAB yang aktif
+  is_spatial_active: true,    // Ditampilkan di peta sebagai layer poligon
+  is_tabulasi_active: true,   // Properti feature bisa dieksplorasi dalam tabel
+  is_dashboard_active: false, // Tidak ada visualisasi dashboard
+  type: 'polygon',
+
   // 1. Definisikan field/kolom apa saja yang ingin ditampilkan saat di-render
   // Ini berguna jika nanti Anda ingin membuat tabel informasi otomatis atau detail panel
   displayFields: [

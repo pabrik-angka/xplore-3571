@@ -80,7 +80,7 @@ export const MapEngine = {
       this.canvasRenderer = L.canvas({ padding: 0.5 });
       
       // Initialize single global layer control and active legend registry
-      this.layerControl = L.control.layers(null, null, { position: 'bottomright', collapsed: false }).addTo(this.map);
+      this.layerControl = L.control.layers(null, null, { position: 'topright', collapsed: false }).addTo(this.map);
       this.activeLegendItems = {};
 
       console.log('✔ Leaflet Map Engine initialized empty with configured center.');
@@ -230,7 +230,7 @@ export const MapEngine = {
         const subCat = config.subcategory || 'Lainnya';
         
         if (!this.buildingLayerGroups[id][subCat]) {
-          this.buildingLayerGroups[id][subCat] = L.featureGroup().addTo(this.map);
+          this.buildingLayerGroups[id][subCat] = L.markerClusterGroup({ chunkedLoading: true }).addTo(this.map);
           if (this.layerControl) {
             this.layerControl.addOverlay(this.buildingLayerGroups[id][subCat], subCat);
           }
@@ -253,7 +253,7 @@ export const MapEngine = {
       this.activeLegendItems[id] = subCatColors;
 
     } else {
-      const featureGroup = L.featureGroup().addTo(this.map);
+      const featureGroup = L.markerClusterGroup({ chunkedLoading: true }).addTo(this.map);
       this.buildingLayerGroups[id] = featureGroup;
 
       const layerLabel = sourceName || 'Titik Bangunan';
@@ -434,7 +434,7 @@ export const MapEngine = {
    */
   updateLegend() {
     if (!this.legendControl) {
-      this.legendControl = L.control({ position: 'bottomright' });
+      this.legendControl = L.control({ position: 'topright' });
       this.legendControl.onAdd = function (map) {
         const div = L.DomUtil.create('div', 'info legend bg-base-100/95 backdrop-blur shadow-lg p-3 rounded-lg border border-base-200 text-xs mt-2 min-w-[180px]');
         div.id = 'global-map-legend';
@@ -489,4 +489,46 @@ export const MapEngine = {
       }
     }
   }
+};
+
+// Global Event Listeners untuk sinkronisasi state secara reaktif
+if (typeof document !== 'undefined') {
+  // Import dinamis moduleManager untuk menghindari circular dependency di level modul
+  const _getModuleManager = () => import('./moduleManager.js');
+
+  /**
+   * Memperbarui visibilitas tombol FAB berdasarkan kapabilitas gabungan semua modul aktif.
+   * Dipanggil setiap kali modul baru didaftarkan ke ModuleManager.
+   * @param {{ spatial: boolean, tabulasi: boolean, dashboard: boolean }} caps
+   */
+  function _syncFabVisibility(caps) {
+    const btnMap   = document.getElementById('fab-item-map');
+    const btnTable = document.getElementById('fab-item-table');
+    const btnDash  = document.getElementById('fab-item-dashboard');
+    if (btnMap)   btnMap.classList.toggle('hidden', !caps.spatial);
+    if (btnTable) btnTable.classList.toggle('hidden', !caps.tabulasi);
+    if (btnDash)  btnDash.classList.toggle('hidden', !caps.dashboard);
+  }
+
+  document.addEventListener('app:polygon-changed', async (e) => {
+    const { polygonData, handler } = e.detail;
+    MapEngine.renderPolygon(polygonData, handler);
+
+    // Daftarkan modul poligon ke registry aktif
+    const { registerActiveModule, getAggregatedCapabilities } = await _getModuleManager();
+    registerActiveModule(handler);
+    _syncFabVisibility(getAggregatedCapabilities());
+  });
+
+  document.addEventListener('app:buildings-changed', async (e) => {
+    const { buildingLayerSet } = e.detail;
+    MapEngine.renderBuilding(buildingLayerSet);
+
+    // Daftarkan modul bangunan ke registry aktif (handler ada di dalam buildingLayerSet)
+    if (buildingLayerSet.handler) {
+      const { registerActiveModule, getAggregatedCapabilities } = await _getModuleManager();
+      registerActiveModule(buildingLayerSet.handler);
+      _syncFabVisibility(getAggregatedCapabilities());
+    }
+  });
 }

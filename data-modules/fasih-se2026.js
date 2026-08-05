@@ -1,9 +1,14 @@
-// map-modules/fasih-se2026.js
+// data-modules/fasih-se2026.js
 
 export const FasihSE2026 = {
   id: 'fasih-se2026',
   name: 'Fasih SE2026',
   type: 'building',
+
+  // Kapabilitas fitur modul — menentukan tombol FAB yang aktif
+  is_spatial_active: true,    // Ditampilkan di peta sebagai titik marker
+  is_tabulasi_active: true,   // Data bisa dieksplorasi dalam tabel
+  is_dashboard_active: true,  // Ada visualisasi dashboard (kategori keterangan)
 
   getMarkerOptions(p, fileType = 'csv') {
     const isDitemukan = String(p["is_ditemukan"]).toUpperCase() === "TRUE";
@@ -15,7 +20,7 @@ export const FasihSE2026 = {
     if (isDitemukan && isPrelistUsaha) {
       if (jumlahUsaha > 0 && jumlahUsaha < 10) keterangan = "Prelist Usaha - Berusaha";
       else if (jumlahUsaha < 1) keterangan = "Prelist Usaha - 0 Usaha";
-    } 
+    }
     else if (isDitemukan && !isPrelist) {
       if (jumlahUsaha > 0 && jumlahUsaha < 10) keterangan = "Assign Baru - Berusaha";
       else if (jumlahUsaha < 1) keterangan = "Assign Baru - 0 Usaha";
@@ -48,7 +53,7 @@ export const FasihSE2026 = {
   toLayerConfig(p) {
     const lat = parseFloat(p["latitude"] || p["lat"]);
     const lng = parseFloat(p["longitude"] || p["long"] || p["lng"]);
-    
+
     if (isNaN(lat) || isNaN(lng)) return null;
 
     const nama = p["Nama.Keluarga/Bangunan/Usaha"] || '-';
@@ -67,7 +72,7 @@ export const FasihSE2026 = {
     if (isDitemukan && isPrelistUsaha) {
       if (jumlahUsaha > 0 && jumlahUsaha < 10) keterangan = "Prelist Usaha - Berusaha";
       else if (jumlahUsaha < 1) keterangan = "Prelist Usaha - 0 Usaha";
-    } 
+    }
     else if (isDitemukan && !isPrelist) {
       if (jumlahUsaha > 0 && jumlahUsaha < 10) keterangan = "Assign Baru - Berusaha";
       else if (jumlahUsaha < 1) keterangan = "Assign Baru - 0 Usaha";

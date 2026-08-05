@@ -1,6 +1,12 @@
-// map-modules/bangunan-blank-template.js
+// data-modules/bangunan-blank-template.js
 
 export const bangunanTemplateHandler = {
+  // Kapabilitas fitur modul — menentukan tombol FAB yang aktif
+  is_spatial_active: true,    // Ditampilkan di peta sebagai titik marker
+  is_tabulasi_active: true,   // Data bisa dieksplorasi dalam tabel
+  is_dashboard_active: false, // Belum ada visualisasi dashboard
+  type: 'building',
+
   // 1. Definisikan informasi/field apa saja yang akan ditampilkan di dalam POPUP marker
   displayFields: [
     { field: 'id_bgn', label: 'ID Bangunan' },
