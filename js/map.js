@@ -9,9 +9,9 @@ if (typeof L !== 'undefined' && L.Canvas) {
       if (!this._drawing || layer._empty()) { return; }
 
       var p = layer._point,
-          ctx = this._ctx,
-          r = Math.max(Math.round(layer._radius), 1),
-          s = (Math.max(Math.round(layer._radiusY), 1) || r) / r;
+        ctx = this._ctx,
+        r = Math.max(Math.round(layer._radius), 1),
+        s = (Math.max(Math.round(layer._radiusY), 1) || r) / r;
 
       if (s !== 1) {
         ctx.save();
@@ -38,7 +38,7 @@ export const MapEngine = {
   map: null,
   polygonLayerGroup: null,
   rawGeoJsonInstance: null,
-  polygonSnapshot: null, 
+  polygonSnapshot: null,
   buildingLayerGroups: {}, // Menyimpan L.featureGroup masing-masing sumber bangunan
   buildingSnapshots: {},   // Menyimpan array layer L.circleMarker titik mentah
   baseLayers: {},
@@ -49,7 +49,7 @@ export const MapEngine = {
    */
   init(containerId) {
     try {
-      if (this.map) return; 
+      if (this.map) return;
 
       // VALIDASI: Cek apakah elemen ada di DOM saat ini
       const container = document.getElementById(containerId);
@@ -78,7 +78,7 @@ export const MapEngine = {
 
       this.polygonLayerGroup = L.featureGroup().addTo(this.map);
       this.canvasRenderer = L.canvas({ padding: 0.5 });
-      
+
       // Initialize single global layer control and active legend registry
       this.layerControl = L.control.layers(null, null, { position: 'topright', collapsed: false }).addTo(this.map);
       this.activeLegendItems = {};
@@ -105,7 +105,7 @@ export const MapEngine = {
    */
   switchBasemap(type) {
     if (!this.map || !this.baseLayers[type]) return;
-    
+
     this.map.removeLayer(this.currentBaseLayer);
     this.currentBaseLayer = this.baseLayers[type];
     this.currentBaseLayer.addTo(this.map);
@@ -116,7 +116,7 @@ export const MapEngine = {
    */
   renderPolygon(geojsonData, handlerStyle) {
     if (!this.map || !this.polygonLayerGroup) return;
-    
+
     this.polygonLayerGroup.clearLayers();
 
     this.rawGeoJsonInstance = L.geoJSON(geojsonData, {
@@ -144,7 +144,7 @@ export const MapEngine = {
     });
 
     this.map.fitBounds(this.polygonLayerGroup.getBounds());
-    
+
     // Pastikan titik bangunan digambar di atas polygon pada canvas
     this.bringBuildingsToFront();
   },
@@ -186,7 +186,7 @@ export const MapEngine = {
 
     // Terapkan filter spasial ke titik bangunan (mengikuti polygon)
     this.applySpatialFilter();
-    
+
     // Pastikan titik bangunan digambar di atas polygon pada canvas setelah pemfilteran
     this.bringBuildingsToFront();
   },
@@ -196,7 +196,7 @@ export const MapEngine = {
    */
   renderBuilding(buildingLayerSet) {
     if (!this.map) return;
-    
+
     const { id, points, sourceName } = buildingLayerSet;
 
     // Bersihkan layer lama jika re-render
@@ -228,9 +228,13 @@ export const MapEngine = {
       points.forEach(item => {
         const { config, style } = item;
         const subCat = config.subcategory || 'Lainnya';
-        
+
         if (!this.buildingLayerGroups[id][subCat]) {
-          this.buildingLayerGroups[id][subCat] = L.markerClusterGroup({ chunkedLoading: true }).addTo(this.map);
+          this.buildingLayerGroups[id][subCat] = L.markerClusterGroup({
+            chunkedLoading: true,
+            maxClusterRadius: 40,
+            disableClusteringAtZoom: 14
+          }).addTo(this.map);
           if (this.layerControl) {
             this.layerControl.addOverlay(this.buildingLayerGroups[id][subCat], subCat);
           }
@@ -253,7 +257,11 @@ export const MapEngine = {
       this.activeLegendItems[id] = subCatColors;
 
     } else {
-      const featureGroup = L.markerClusterGroup({ chunkedLoading: true }).addTo(this.map);
+      const featureGroup = L.markerClusterGroup({
+        chunkedLoading: true,
+        // maxClusterRadius: 80,
+        // disableClusteringAtZoom: 22
+      }).addTo(this.map);
       this.buildingLayerGroups[id] = featureGroup;
 
       const layerLabel = sourceName || 'Titik Bangunan';
@@ -285,7 +293,7 @@ export const MapEngine = {
 
     // Perbarui Tampilan Legenda Global
     this.updateLegend();
-    
+
     // Pastikan titik bangunan digambar di atas polygon pada canvas setelah ditambahkan
     this.bringBuildingsToFront();
 
@@ -312,7 +320,7 @@ export const MapEngine = {
     // Jika ada polygon, filter titik
     for (const id in this.buildingSnapshots) {
       const snapshot = this.buildingSnapshots[id];
-      
+
       snapshot.forEach(marker => {
         const isInside = this.isPointInPolygon(marker.itemLatLng, this.polygonLayerGroup);
         if (isInside) {
@@ -331,7 +339,7 @@ export const MapEngine = {
     let inside = false;
     layerGroup.eachLayer(layer => {
       if (inside) return;
-      
+
       // Optimasi dengan Bounding Box Leaflet (super cepat)
       if (layer.getBounds && !layer.getBounds().contains(latlng)) return;
 
@@ -342,12 +350,12 @@ export const MapEngine = {
       } else if (layer.feature.geometry.type === 'MultiPolygon') {
         polygons = layer.feature.geometry.coordinates;
       }
-      
+
       for (const poly of polygons) {
         if (inside) break;
-        const ring = poly[0]; 
+        const ring = poly[0];
         let intersect = false;
-        
+
         for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
           const xi = ring[i][0], yi = ring[i][1];
           const xj = ring[j][0], yj = ring[j][1];
@@ -355,7 +363,7 @@ export const MapEngine = {
             intersect = !intersect;
           }
         }
-        
+
         if (intersect) {
           let inHole = false;
           for (let k = 1; k < poly.length; k++) {
@@ -384,9 +392,9 @@ export const MapEngine = {
    */
   focusToBuilding(layerId, lat, lng, popupHtml) {
     if (!this.map) return;
-    
+
     const targetLatLng = L.latLng(lat, lng);
-    
+
     // Zoom in dan pindah ke koordinat target dengan animasi
     this.map.flyTo(targetLatLng, 19, {
       animate: true,
@@ -502,12 +510,12 @@ if (typeof document !== 'undefined') {
    * @param {{ spatial: boolean, tabulasi: boolean, dashboard: boolean }} caps
    */
   function _syncFabVisibility(caps) {
-    const btnMap   = document.getElementById('fab-item-map');
+    const btnMap = document.getElementById('fab-item-map');
     const btnTable = document.getElementById('fab-item-table');
-    const btnDash  = document.getElementById('fab-item-dashboard');
-    if (btnMap)   btnMap.classList.toggle('hidden', !caps.spatial);
+    const btnDash = document.getElementById('fab-item-dashboard');
+    if (btnMap) btnMap.classList.toggle('hidden', !caps.spatial);
     if (btnTable) btnTable.classList.toggle('hidden', !caps.tabulasi);
-    if (btnDash)  btnDash.classList.toggle('hidden', !caps.dashboard);
+    if (btnDash) btnDash.classList.toggle('hidden', !caps.dashboard);
   }
 
   document.addEventListener('app:polygon-changed', async (e) => {

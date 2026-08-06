@@ -59,10 +59,9 @@ xplore-3571/
     ├── table.js            # Mesin Tabulasi: Render grid, search, filter, & pagination
     ├── dashboard.js        # Mesin Dashboard: ApexCharts wrapper & data agregator
     ├── ui.js               # UI Orchestrator: Event listener & manipulasi DOM umum
-    ├── sourceRegistry.js   # Registry untuk mendaftarkan handler titik bangunan
-    ├── polygonRegistry.js  # Registry untuk mendaftarkan handler poligon wilayah
+    ├── moduleRegistry.js   # Registry untuk mendaftarkan handler titik bangunan, polygon wilayah, data tabulasi
     │
-    └── map-modules/        # Handler modular untuk strategy pattern parsing data
+    └── data-modules/       # Handler modular untuk strategy pattern parsing data
         ├── wilkerstat-se2026.js
         ├── sourceAHandler.js
         ├── sourceBHandler.js
