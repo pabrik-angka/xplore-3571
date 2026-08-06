@@ -1,6 +1,8 @@
 // js/map.js
 import { CONFIG } from './config.js';
 import { Store } from './store.js';
+import { SpatialFilter } from './helpers/spatial-filter.js';
+import { BuildingLayerManager } from './helpers/building-layer-manager.js';
 
 // Extend Leaflet's Canvas renderer to support drawing squares natively on canvas
 if (typeof L !== 'undefined' && L.Canvas) {
@@ -39,10 +41,13 @@ export const MapEngine = {
   polygonLayerGroup: null,
   rawGeoJsonInstance: null,
   polygonSnapshot: null,
-  buildingLayerGroups: {}, // Menyimpan L.featureGroup masing-masing sumber bangunan
-  buildingSnapshots: {},   // Menyimpan array layer L.circleMarker titik mentah
   baseLayers: {},
   currentBaseLayer: null,
+
+  // Getters untuk backward-compat / mapping data dari manager
+  get buildingLayerGroups() { return BuildingLayerManager.buildingLayerGroups; },
+  get buildingSnapshots() { return BuildingLayerManager.buildingSnapshots; },
+  get activeLegendItems() { return BuildingLayerManager.activeLegendItems; },
 
   /**
    * Inisialisasi peta dasar kosongan di awal sesuai config
@@ -81,7 +86,6 @@ export const MapEngine = {
 
       // Initialize single global layer control and active legend registry
       this.layerControl = L.control.layers(null, null, { position: 'topright', collapsed: false }).addTo(this.map);
-      this.activeLegendItems = {};
 
       console.log('✔ Leaflet Map Engine initialized empty with configured center.');
       return true; // Sukses
@@ -192,198 +196,129 @@ export const MapEngine = {
   },
 
   /**
-   * Merender titik bangunan dari Store ke dalam satu Layer Control dan Legenda global
+   * Menghapus layer bangunan & legenda spesifik dari peta Leaflet secara bersih
    */
-  renderBuilding(buildingLayerSet) {
-    if (!this.map) return;
-
-    const { id, points, sourceName } = buildingLayerSet;
-
-    // Bersihkan layer lama jika re-render
-    if (this.buildingLayerGroups[id]) {
-      if (this.buildingLayerGroups[id] instanceof L.LayerGroup) {
-        this.map.removeLayer(this.buildingLayerGroups[id]);
-        if (this.layerControl) this.layerControl.removeLayer(this.buildingLayerGroups[id]);
-      } else {
-        Object.values(this.buildingLayerGroups[id]).forEach(g => {
-          this.map.removeLayer(g);
-          if (this.layerControl) this.layerControl.removeLayer(g);
-        });
-      }
-      delete this.buildingLayerGroups[id];
-    }
-    if (this.activeLegendItems[id]) {
-      delete this.activeLegendItems[id];
-    }
-
-    this.buildingSnapshots[id] = [];
-    let mainBounds = L.latLngBounds();
-
-    const hasSubcategory = points.some(p => p.config.subcategory);
-
-    if (hasSubcategory) {
-      this.buildingLayerGroups[id] = {};
-      const subCatColors = {};
-
-      points.forEach(item => {
-        const { config, style } = item;
-        const subCat = config.subcategory || 'Lainnya';
-
-        if (!this.buildingLayerGroups[id][subCat]) {
-          this.buildingLayerGroups[id][subCat] = L.markerClusterGroup({
-            chunkedLoading: true,
-            maxClusterRadius: 40,
-            disableClusteringAtZoom: 14
-          }).addTo(this.map);
-          if (this.layerControl) {
-            this.layerControl.addOverlay(this.buildingLayerGroups[id][subCat], subCat);
-          }
-          subCatColors[subCat] = style.fillColor || style.color || '#cccccc';
-        }
-
-        const marker = L.circleMarker([config.geometry.lat, config.geometry.lng], {
-          ...style,
-          renderer: this.canvasRenderer
-        });
-        marker.bindPopup(config.popupHtml);
-        marker.itemLatLng = L.latLng(config.geometry.lat, config.geometry.lng);
-        marker.targetGroup = this.buildingLayerGroups[id][subCat];
-        marker.targetGroup.addLayer(marker);
-
-        mainBounds.extend(marker.itemLatLng);
-        this.buildingSnapshots[id].push(marker);
-      });
-
-      this.activeLegendItems[id] = subCatColors;
-
-    } else {
-      const featureGroup = L.markerClusterGroup({
-        chunkedLoading: true,
-        // maxClusterRadius: 80,
-        // disableClusteringAtZoom: 22
-      }).addTo(this.map);
-      this.buildingLayerGroups[id] = featureGroup;
-
-      const layerLabel = sourceName || 'Titik Bangunan';
-      if (this.layerControl) {
-        this.layerControl.addOverlay(featureGroup, layerLabel);
-      }
-
-      let firstColor = '#cccccc';
-      points.forEach(item => {
-        const { config, style } = item;
-        if (firstColor === '#cccccc') {
-          firstColor = style.fillColor || style.color || '#cccccc';
-        }
-        const marker = L.circleMarker([config.geometry.lat, config.geometry.lng], {
-          ...style,
-          renderer: this.canvasRenderer
-        });
-        marker.bindPopup(config.popupHtml);
-        marker.itemLatLng = L.latLng(config.geometry.lat, config.geometry.lng);
-        marker.targetGroup = featureGroup;
-        marker.targetGroup.addLayer(marker);
-
-        mainBounds.extend(marker.itemLatLng);
-        this.buildingSnapshots[id].push(marker);
-      });
-
-      this.activeLegendItems[id] = { [layerLabel]: firstColor };
-    }
-
-    // Perbarui Tampilan Legenda Global
-    this.updateLegend();
-
-    // Pastikan titik bangunan digambar di atas polygon pada canvas setelah ditambahkan
-    this.bringBuildingsToFront();
-
-    if (mainBounds.isValid()) {
-      this.map.fitBounds(mainBounds);
-    }
+  removeBuilding(id) {
+    BuildingLayerManager.removeBuilding(this.map, this.layerControl, id, () => this.updateLegend());
   },
 
   /**
+   * Merender titik bangunan dari Store ke dalam satu Layer Control dan Legenda global
+   */
+  renderBuilding(buildingLayerSet) {
+    BuildingLayerManager.renderBuilding(this.map, this.layerControl, this.canvasRenderer, buildingLayerSet, () => this.updateLegend());
+  },
+
+  /**
+   * Menambahkan batch titik baru ke layer bangunan yang sudah ada (Incremental Loading)
+   */
+  appendBuildingBatch(id, newPoints, isFirstBatch = false) {
+    BuildingLayerManager.appendBuildingBatch(this.map, this.layerControl, this.canvasRenderer, id, newPoints, isFirstBatch, () => this.updateLegend());
+  },
+
+
+  /**
    * Menjalankan filter titik yang berada di dalam polygon yang terlihat (Point-in-Polygon)
+   * Menggunakan Stage 1 Fast Bounding Box Pruning (O(1)) & Stage 2 Bulk Layer Operation (60 FPS)
    */
   applySpatialFilter() {
     if (!this.polygonLayerGroup || this.polygonLayerGroup.getLayers().length === 0) {
       // Jika tidak ada polygon, tampilkan semua titik utuh
       for (const id in this.buildingSnapshots) {
         const snapshot = this.buildingSnapshots[id];
-        snapshot.forEach(marker => {
-          if (!marker.targetGroup.hasLayer(marker)) marker.targetGroup.addLayer(marker);
-        });
+        const toAdd = snapshot.filter(m => !m.targetGroup.hasLayer(m));
+        if (toAdd.length > 0) {
+          const group = snapshot[0]?.targetGroup;
+          if (group && group.addLayers) group.addLayers(toAdd);
+          else if (group) toAdd.forEach(m => group.addLayer(m));
+        }
       }
       return;
     }
 
-    // Jika ada polygon, filter titik
+    // 1. STAGE 1: Fast Bounding Box Pruning & Active Polygon Extraction
+    const visibleBounds = this.polygonLayerGroup.getBounds();
+    if (!visibleBounds || !visibleBounds.isValid()) return;
+
+    // Pre-extract daftar polygon aktif yang valid menggunakan SpatialFilter Helper
+    const activePolygons = SpatialFilter.getActivePolygons(this.polygonLayerGroup);
+
     for (const id in this.buildingSnapshots) {
       const snapshot = this.buildingSnapshots[id];
+      const candidateMarkers = [];
+      const instantRemove = [];
 
+      // Eliminasi instan titik di luar Bounding Box
       snapshot.forEach(marker => {
-        const isInside = this.isPointInPolygon(marker.itemLatLng, this.polygonLayerGroup);
-        if (isInside) {
-          if (!marker.targetGroup.hasLayer(marker)) marker.targetGroup.addLayer(marker);
+        if (!visibleBounds.contains(marker.itemLatLng)) {
+          if (marker.targetGroup.hasLayer(marker)) {
+            instantRemove.push(marker);
+          }
         } else {
-          if (marker.targetGroup.hasLayer(marker)) marker.targetGroup.removeLayer(marker);
+          candidateMarkers.push(marker);
         }
       });
+
+      // Bulk remove titik di luar Bounding Box (1x kalkulasi grid)
+      if (instantRemove.length > 0) {
+        const group = instantRemove[0]?.targetGroup;
+        if (group && group.removeLayers) group.removeLayers(instantRemove);
+        else if (group) instantRemove.forEach(m => group.removeLayer(m));
+      }
+
+      // 2. STAGE 2: Async Bulk Micro-Yielding Ray-Casting pada Titik Kandidat
+      if (candidateMarkers.length > 0) {
+        this._processSpatialCandidateBatch(candidateMarkers, activePolygons, 0, 1000);
+      }
     }
   },
 
   /**
-   * Algoritma Ray-Casting Point-in-Polygon
+   * Batch processing async Ray-Casting dengan Operasi Bulk Array (addLayers / removeLayers)
    */
-  isPointInPolygon(latlng, layerGroup) {
-    let inside = false;
-    layerGroup.eachLayer(layer => {
-      if (inside) return;
+  _processSpatialCandidateBatch(candidates, activePolygons, startIndex, batchSize) {
+    const endIndex = Math.min(startIndex + batchSize, candidates.length);
+    const toAdd = [];
+    const toRemove = [];
 
-      // Optimasi dengan Bounding Box Leaflet (super cepat)
-      if (layer.getBounds && !layer.getBounds().contains(latlng)) return;
+    for (let i = startIndex; i < endIndex; i++) {
+      const marker = candidates[i];
+      const isInside = SpatialFilter.isPointInPolygonFast(marker.itemLatLng, activePolygons);
 
-      const pt = [latlng.lng, latlng.lat];
-      let polygons = [];
-      if (layer.feature.geometry.type === 'Polygon') {
-        polygons = [layer.feature.geometry.coordinates];
-      } else if (layer.feature.geometry.type === 'MultiPolygon') {
-        polygons = layer.feature.geometry.coordinates;
-      }
-
-      for (const poly of polygons) {
-        if (inside) break;
-        const ring = poly[0];
-        let intersect = false;
-
-        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-          const xi = ring[i][0], yi = ring[i][1];
-          const xj = ring[j][0], yj = ring[j][1];
-          if (((yi > pt[1]) != (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi)) {
-            intersect = !intersect;
-          }
+      if (isInside) {
+        if (!marker.targetGroup.hasLayer(marker)) {
+          toAdd.push(marker);
         }
-
-        if (intersect) {
-          let inHole = false;
-          for (let k = 1; k < poly.length; k++) {
-            const hole = poly[k];
-            let intersectHole = false;
-            for (let i = 0, j = hole.length - 1; i < hole.length; j = i++) {
-              const xi = hole[i][0], yi = hole[i][1];
-              const xj = hole[j][0], yj = hole[j][1];
-              if (((yi > pt[1]) != (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi)) {
-                intersectHole = !intersectHole;
-              }
-            }
-            if (intersectHole) { inHole = true; break; }
-          }
-          if (!inHole) inside = true;
+      } else {
+        if (marker.targetGroup.hasLayer(marker)) {
+          toRemove.push(marker);
         }
       }
-    });
-    return inside;
+    }
+
+    // Eksekusi Bulk Layer Operations (HANYA 1X KALKULASI GRID & DOM REFLOW PER BATCH)
+    if (candidates.length > 0) {
+      const group = candidates[0]?.targetGroup;
+      if (group) {
+        if (toRemove.length > 0) {
+          if (group.removeLayers) group.removeLayers(toRemove);
+          else toRemove.forEach(m => group.removeLayer(m));
+        }
+        if (toAdd.length > 0) {
+          if (group.addLayers) group.addLayers(toAdd);
+          else toAdd.forEach(m => group.addLayer(m));
+        }
+      }
+    }
+
+    // Lanjutkan batch berikutnya di frame berikutnya (requestAnimationFrame 60 FPS)
+    if (endIndex < candidates.length) {
+      requestAnimationFrame(() => {
+        this._processSpatialCandidateBatch(candidates, activePolygons, endIndex, batchSize);
+      });
+    }
   },
+
 
   /**
    * ==========================================
@@ -482,61 +417,38 @@ export const MapEngine = {
    * Mengatur antrean gambar (drawing queue) pada Canvas agar semua marker berada di atas polygon
    */
   bringBuildingsToFront() {
-    for (const id in this.buildingLayerGroups) {
-      const group = this.buildingLayerGroups[id];
-      if (group) {
-        if (group instanceof L.LayerGroup) {
-          group.bringToFront();
-        } else {
-          Object.values(group).forEach(g => {
-            if (g && typeof g.bringToFront === 'function') {
-              g.bringToFront();
-            }
-          });
-        }
-      }
-    }
-  }
-};
-
-// Global Event Listeners untuk sinkronisasi state secara reaktif
-if (typeof document !== 'undefined') {
-  // Import dinamis moduleManager untuk menghindari circular dependency di level modul
-  const _getModuleManager = () => import('./moduleManager.js');
+    BuildingLayerManager.bringBuildingsToFront();
+  },
 
   /**
-   * Memperbarui visibilitas tombol FAB berdasarkan kapabilitas gabungan semua modul aktif.
-   * Dipanggil setiap kali modul baru didaftarkan ke ModuleManager.
-   * @param {{ spatial: boolean, tabulasi: boolean, dashboard: boolean }} caps
+   * Highlight & Fly-To titik lokasi dari linked view tabulasi
    */
-  function _syncFabVisibility(caps) {
-    const btnMap = document.getElementById('fab-item-map');
-    const btnTable = document.getElementById('fab-item-table');
-    const btnDash = document.getElementById('fab-item-dashboard');
-    if (btnMap) btnMap.classList.toggle('hidden', !caps.spatial);
-    if (btnTable) btnTable.classList.toggle('hidden', !caps.tabulasi);
-    if (btnDash) btnDash.classList.toggle('hidden', !caps.dashboard);
+  highlightExplorePoint(lat, lng) {
+    if (!this.map || isNaN(lat) || isNaN(lng)) return;
+
+    const targetLatLng = L.latLng(lat, lng);
+    this.map.flyTo(targetLatLng, 19, { animate: true, duration: 1.2 });
+
+    // Animasi pulsa highlight sementara
+    const circle = L.circleMarker(targetLatLng, {
+      radius: 18,
+      color: '#f59e0b',
+      fillColor: '#fbbf24',
+      fillOpacity: 0.4,
+      weight: 3
+    }).addTo(this.map);
+
+    setTimeout(() => {
+      let opacity = 0.4;
+      const fadeInterval = setInterval(() => {
+        opacity -= 0.05;
+        if (opacity <= 0) {
+          clearInterval(fadeInterval);
+          this.map.removeLayer(circle);
+        } else {
+          circle.setStyle({ fillOpacity: opacity, opacity: opacity * 2 });
+        }
+      }, 50);
+    }, 1500);
   }
-
-  document.addEventListener('app:polygon-changed', async (e) => {
-    const { polygonData, handler } = e.detail;
-    MapEngine.renderPolygon(polygonData, handler);
-
-    // Daftarkan modul poligon ke registry aktif
-    const { registerActiveModule, getAggregatedCapabilities } = await _getModuleManager();
-    registerActiveModule(handler);
-    _syncFabVisibility(getAggregatedCapabilities());
-  });
-
-  document.addEventListener('app:buildings-changed', async (e) => {
-    const { buildingLayerSet } = e.detail;
-    MapEngine.renderBuilding(buildingLayerSet);
-
-    // Daftarkan modul bangunan ke registry aktif (handler ada di dalam buildingLayerSet)
-    if (buildingLayerSet.handler) {
-      const { registerActiveModule, getAggregatedCapabilities } = await _getModuleManager();
-      registerActiveModule(buildingLayerSet.handler);
-      _syncFabVisibility(getAggregatedCapabilities());
-    }
-  });
-}
+};

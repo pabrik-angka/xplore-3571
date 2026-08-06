@@ -4,8 +4,11 @@
  */
 import { UI } from './ui.js';
 import { MapEngine } from './map.js';
+import { TableEngine } from './table.js';
 import { Router } from './router.js';
-import SpatialFilterManager from './spatialFilter.js';
+import { Store } from './store.js';
+import { StorageDB } from './db.js';
+import { ListenerManager } from './listenerManager.js';
 
 async function loadComponent(containerId, filePath) {
   try {
@@ -42,6 +45,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   UI.reCacheElements();
   UI.init();
 
-  // 4. Inisialisasi SPA Router
+  // 4. Inisialisasi Table Engine
+  TableEngine.init();
+
+  // 5. Inisialisasi PWA IndexedDB & Hydrate Dataset Offline Cache
+  await StorageDB.init();
+  await Store.loadStoredDatasets();
+
+  // 6. Daftarkan semua global event listener via ListenerManager
+  ListenerManager.init();
+
+  // 7. Inisialisasi SPA Router
   Router.init();
 });

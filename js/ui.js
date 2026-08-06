@@ -3,9 +3,9 @@
  */
 import { getAllPolygonSources, getPolygonHandler, getAllBuildingSources, getHandler } from './moduleRegistry.js';
 import { SearchComponent } from './components/search.js';
-
-// component modal load file
 import { openSpatialModal } from './components/modal.js';
+import { ToastComponent } from './components/toast.js';
+import { resetSpatialFilterDropdowns } from './helpers/resetSpatialFilter.js';
 
 export const UI = {
   elements: {},
@@ -21,12 +21,12 @@ export const UI = {
       networkStatus: document.getElementById('network-status'),
       btnOsm: document.getElementById('basemap-osm'),
       btnGoogle: document.getElementById('basemap-google'),
-      
+
       btnTriggerPolygonModal: document.getElementById('btn-trigger-polygon-modal'),
       btnTriggerBuildingModal: document.getElementById('btn-trigger-building-modal'),
       btnTriggerExploreModal: document.getElementById('btn-trigger-explore-modal'),
       activeModulesList: document.getElementById('active-modules-list'),
-      
+
       filterProv: document.getElementById('filter-prov'),
       filterKab: document.getElementById('filter-kab'),
       filterKec: document.getElementById('filter-kec'),
@@ -36,7 +36,7 @@ export const UI = {
   },
 
   /**
-   * Inisialisasi seluruh event listener UI
+   * Inisialisasi seluruh event listener UI (UI Orchestrator)
    */
   init() {
     this.setupSidebarToggle();
@@ -44,10 +44,11 @@ export const UI = {
     this.setupModalTriggers();
     this.setupNetworkMonitoring();
     this.setupActiveModulesListener();
-    
+    this.setupStoreEventListeners();
+
     // Inisialisasi komponen pencarian
     SearchComponent.init();
-    console.log('✔ UI Module initialized cleanly with external Modal Component.');
+    console.log('✔ UI Orchestrator initialized cleanly.');
   },
 
   /**
@@ -65,9 +66,7 @@ export const UI = {
         sb.classList.add('w-80');
       }
 
-      // PERBAIKAN BUG BLANK MAP: Beritahu Leaflet bahwa kontainer berubah ukuran
       import('./map.js').then(({ MapEngine }) => {
-        // Berikan sedikit delay 150-300ms jika sidebar Anda menggunakan animasi transisi Tailwind
         setTimeout(() => {
           MapEngine.resize();
         }, 200);
@@ -85,7 +84,7 @@ export const UI = {
     const toggleActive = (activeBtn, inactiveBtn, basemapType) => {
       activeBtn.classList.add('btn-active', 'btn-primary');
       inactiveBtn.classList.remove('btn-active', 'btn-primary');
-      
+
       import('./map.js').then(({ MapEngine }) => {
         MapEngine.switchBasemap(basemapType);
       });
@@ -101,14 +100,12 @@ export const UI = {
    * Mendaftarkan pemicu modal spasial menggunakan skema dinamis dari Registry
    */
   setupModalTriggers() {
-    // 1. Trigger Modal Polygon dinamis dari Registry
     if (this.elements.btnTriggerPolygonModal) {
       this.elements.btnTriggerPolygonModal.addEventListener('click', () => {
         openSpatialModal({
           title: 'Load Polygon Wilayah',
-          dataType: 'polygon', 
+          dataType: 'polygon',
           accept: '.geojson, .json',
-          // PERBAIKAN BUG: Menggunakan arrow function agar konteks "this" merujuk ke objek UI, bukan objek Modal
           onProcess: (file, schemaId) => {
             this.processPolygonFile(file, schemaId);
           },
@@ -117,7 +114,6 @@ export const UI = {
       });
     }
 
-    // 2. Trigger Modal Bangunan dinamis dari Registry
     if (this.elements.btnTriggerBuildingModal) {
       this.elements.btnTriggerBuildingModal.addEventListener('click', () => {
         const buildingOptions = getAllBuildingSources().map(src => ({ value: src.id, label: src.name }));
@@ -126,7 +122,6 @@ export const UI = {
           title: 'Muat Titik Bangunan',
           options: buildingOptions,
           accept: '.geojson,.json,.csv',
-          // PERBAIKAN BUG: Disamakan menggunakan arrow function yang aman
           onProcess: (file, selectedSchema) => {
             this.processBuildingFile(file, selectedSchema);
           },
@@ -134,10 +129,9 @@ export const UI = {
         });
       });
     }
-    // 3. Trigger Modal Explorasi Data (btn di sidebar Collapse 2)
+
     if (this.elements.btnTriggerExploreModal) {
       this.elements.btnTriggerExploreModal.addEventListener('click', () => {
-        // TODO: Buka modal explorasi tabulasi/data di iterasi berikutnya
         this.showToast('Fitur Muat Data Modul akan segera hadir!', 'info');
       });
     }
@@ -145,7 +139,6 @@ export const UI = {
 
   /**
    * Mendengarkan event 'app:modules-changed' dan merender ulang daftar modul aktif di sidebar.
-   * Pattern: passive reactive listener — tidak menyimpan state sendiri.
    */
   setupActiveModulesListener() {
     document.addEventListener('app:modules-changed', (e) => {
@@ -155,8 +148,7 @@ export const UI = {
   },
 
   /**
-   * Merender daftar <li> modul aktif ke dalam #active-modules-list di sidebar.
-   * @param {Array} modules - Array dari ModuleManager.getActiveModules()
+   * Merender daftar modul aktif ke dalam sidebar
    */
   _renderActiveModulesList(modules) {
     const list = document.getElementById('active-modules-list');
@@ -188,19 +180,16 @@ export const UI = {
    */
   processPolygonFile(file, schemaId) {
     this.showLoading(true, `Membaca berkas ${file.name}...`);
-    
-    // Panggil engine store untuk memvalidasi isi internal berkas
+
     import('./store.js').then(({ Store }) => {
       Store.processPolygonFile(file, schemaId)
         .then(({ handler, filterMetadata }) => {
           this.showToast(`✔ Berkas berhasil diverifikasi! Memulai rendering peta...`, 'success');
-          
-          // Render UI filter dinamis ke sidebar container
+
           const filterContainer = document.getElementById('dynamic-filter-container');
           if (filterContainer) {
             import('./map.js').then(({ MapEngine }) => {
               handler.renderFilterUI(filterContainer, filterMetadata, (criteria) => {
-                // Aksi balik saat user memilih opsi filter di sidebar
                 MapEngine.applyPolygonFilter(criteria);
               });
             });
@@ -221,44 +210,61 @@ export const UI = {
    * Pemrosesan awal berkas data bangunan
    */
   processBuildingFile(file, schemaId) {
-    this.showLoading(true, `Membaca berkas bangunan ${file.name}...`);
-    
     const targetSource = getHandler(schemaId);
     if (!targetSource) {
       this.showToast('Skema bangunan tidak terdaftar!', 'error');
-      this.showLoading(false);
       return;
     }
 
     import('./store.js').then(({ Store }) => {
-      Store.processBuildingFile(file, targetSource)
-        .then((buildingLayerSet) => {
-          this.showToast(`✔ Berkas Bangunan berhasil dirender!`, 'success');
-          
-          import('./map.js').then(({ MapEngine }) => {
-            // 1. Reset filter UI di dropdown (jika ada) agar semua kembali utuh
-            const selKec = document.getElementById('filter-sel-kec');
-            const selDesa = document.getElementById('filter-sel-desa');
-            const selSls = document.getElementById('filter-sel-sls');
-            if (selKec) selKec.value = '';
-            if (selDesa) { selDesa.innerHTML = '<option value="">-- DESA --</option>'; selDesa.disabled = true; }
-            if (selSls) { selSls.innerHTML = '<option value="">-- SLS --</option>'; selSls.disabled = true; }
+      const existingDataset = Store.findExistingBuildingDataset(schemaId, file.name);
 
-            // 2. Terapkan filter kosong (reset) ke peta agar seluruh polygon muncul utuh
-            MapEngine.applyPolygonFilter({ kec: '', desa: '', sls: '' });
-            
-            // 3. Panggil ulang applySpatialFilter memastikan state mengikuti polygon utuh
-            MapEngine.applySpatialFilter();
-            this.showLoading(false);
-          }).catch(err => {
-            this.showToast(`❌ Galat Filter Spasial: ${err.message || err}`, 'error');
+      const executeLoading = () => {
+        this.showLoading(true, `Membaca berkas bangunan ${file.name}...`);
+
+        Store.processBuildingFile(file, targetSource)
+          .then((buildingLayerSet) => {
+            this.showToast(`✔ Berkas Bangunan "${buildingLayerSet.sourceName}" berhasil dimuat!`, 'success');
+
+            import('./map.js').then(({ MapEngine }) => {
+              resetSpatialFilterDropdowns();
+              MapEngine.applyPolygonFilter({ kec: '', desa: '', sls: '' });
+              MapEngine.applySpatialFilter();
+              this.showLoading(false);
+            }).catch(err => {
+              this.showToast(`❌ Galat Filter Spasial: ${err.message || err}`, 'error');
+              this.showLoading(false);
+            });
+          })
+          .catch(err => {
+            this.showToast(`❌ Galat Bangunan: ${err}`, 'error');
             this.showLoading(false);
           });
-        })
-        .catch(err => {
-          this.showToast(`❌ Galat Bangunan: ${err}`, 'error');
-          this.showLoading(false);
+      };
+
+      if (existingDataset) {
+        import('./components/confirm-modal.js').then(({ openConfirmModal }) => {
+          openConfirmModal({
+            title: '⚠️ Data Modul Sudah Ada',
+            message: `Modul <strong>"${existingDataset.sourceName}"</strong> (${existingDataset.filename}) sudah dimuat sebelumnya.<br><br>Apakah Anda ingin <strong>memperbarui (overwrite)</strong> dengan data terbaru dari berkas <code>${file.name}</code>?`,
+            confirmText: '🔄 Ya, Perbarui Data',
+            cancelText: 'Batal',
+            confirmClass: 'btn-warning',
+            onConfirm: () => {
+              import('./map.js').then(({ MapEngine }) => {
+                MapEngine.removeBuilding(existingDataset.id);
+                Store.removeBuildingDataset(existingDataset.id);
+                executeLoading();
+              });
+            },
+            onCancel: () => {
+              this.showToast('Proses pemuatan data dibatalkan.', 'info');
+            }
+          });
         });
+      } else {
+        executeLoading();
+      }
     }).catch(err => {
       this.showToast(`❌ Galat Load Module: ${err.message || err}`, 'error');
       this.showLoading(false);
@@ -273,8 +279,8 @@ export const UI = {
     const updateStatus = () => {
       const isOnline = navigator.onLine;
       this.elements.networkStatus.textContent = isOnline ? 'Online' : 'Offline (Lokal)';
-      this.elements.networkStatus.className = isOnline 
-        ? 'badge badge-success badge-sm ml-2 gap-1 text-xs' 
+      this.elements.networkStatus.className = isOnline
+        ? 'badge badge-success badge-sm ml-2 gap-1 text-xs'
         : 'badge badge-error badge-sm ml-2 gap-1 text-xs';
     };
     window.addEventListener('online', updateStatus);
@@ -283,64 +289,33 @@ export const UI = {
   },
 
   /**
-   * (Fungsi setupSearchFocus dihapus karena sudah dimigrasikan ke js/components/search.js)
+   * Mendengarkan event dari store.js tanpa circular import (ISS-04)
+   * store:loading → tampilkan/sembunyikan loading indicator
+   * store:toast   → tampilkan toast notifikasi
    */
+  setupStoreEventListeners() {
+    document.addEventListener('store:loading', (e) => {
+      const { show, text, percent } = e.detail;
+      ToastComponent.showLoading(show, text, percent);
+    });
 
-  /**
-   * Komponen alert toast pemberitahuan universal (Posisi Kanan Atas / top-end)
-   */
-  showToast(message, type = 'info') {
-    const existingToast = document.querySelector('.toast-container');
-    if (existingToast) existingToast.remove();
-
-    const alertClasses = {
-      info: 'alert-info',
-      success: 'alert-success',
-      warning: 'alert-warning',
-      error: 'alert-error'
-    };
-
-    const toastDiv = document.createElement('div');
-    toastDiv.className = 'toast toast-end toast-top z-[9999] toast-container mt-16'; // mt-16 agar tidak terhalang navbar jika ada
-    toastDiv.innerHTML = `
-      <div class="alert ${alertClasses[type]} shadow-lg text-sm font-medium">
-        <span>${message}</span>
-      </div>
-    `;
-    document.body.appendChild(toastDiv);
-    setTimeout(() => toastDiv.remove(), 4000);
+    document.addEventListener('store:toast', (e) => {
+      const { message, type } = e.detail;
+      ToastComponent.showToast(message, type);
+    });
   },
 
   /**
-   * Toast Loading dengan indikator progress (Posisi Kanan Atas / top-end)
+   * Delegasikan Toast notifikasi ke ToastComponent (Komponen UI Modular)
    */
-  showLoading(show = true, text = 'Memproses data spasial...') {
-    let loadingToast = document.getElementById('loading-toast');
-    
-    if (!show) {
-      if (loadingToast) {
-        loadingToast.remove();
-      }
-      return;
-    }
+  showToast(message, type = 'info') {
+    ToastComponent.showToast(message, type);
+  },
 
-    if (!loadingToast) {
-      loadingToast = document.createElement('div');
-      loadingToast.id = 'loading-toast';
-      loadingToast.className = 'toast toast-end toast-top z-[9999] mt-16';
-      loadingToast.innerHTML = `
-        <div class="alert alert-info shadow-xl text-sm font-medium flex flex-col items-start gap-2 min-w-[280px]">
-          <div class="flex items-center gap-2">
-            <span class="loading loading-spinner loading-xs text-primary"></span>
-            <span id="loading-toast-text">${text}</span>
-          </div>
-          <progress class="progress progress-primary w-full h-1"></progress>
-        </div>
-      `;
-      document.body.appendChild(loadingToast);
-    } else {
-      const textEl = loadingToast.querySelector('#loading-toast-text');
-      if (textEl) textEl.textContent = text;
-    }
+  /**
+   * Delegasikan Toast Loading ke ToastComponent (Komponen UI Modular)
+   */
+  showLoading(show = true, text = 'Memproses data...', percent = null) {
+    ToastComponent.showLoading(show, text, percent);
   }
 };

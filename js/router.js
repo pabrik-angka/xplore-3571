@@ -43,12 +43,16 @@ export const Router = {
     // Update status tombol navigasi di UI
     this.updateNavigationUI(hash);
 
-    // KASUS KHUSUS: Resize peta jika kembali ke view-map
+    // KASUS KHUSUS: Handler per rute
     if (hash === '#map') {
       import('./map.js').then(({ MapEngine }) => {
         setTimeout(() => {
           MapEngine.resize();
         }, 100);
+      });
+    } else if (hash === '#table') {
+      import('./table.js').then(({ TableEngine }) => {
+        TableEngine.render();
       });
     }
   },

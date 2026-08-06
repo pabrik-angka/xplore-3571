@@ -42,11 +42,58 @@
         </div>
 
         <!-- SPA View 2: Tabulasi (Tabel) -->
-        <div id="view-table" class="hidden w-full h-full bg-base-100 flex flex-col">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-base-300 bg-base-50 flex-none">
-            <span class="text-sm font-bold text-secondary">📊 Explorasi Tabulasi</span>
+        <div id="view-table" class="hidden w-full h-full bg-base-100 flex flex-col overflow-hidden">
+          
+          <!-- 1. TOP TAB BAR (Multi-Dataset & Pivot Tabs) -->
+          <div class="flex items-center justify-between px-3 pt-2 bg-base-200 border-b border-base-300 flex-none gap-2 overflow-x-auto">
+            <div id="tabulation-tab-bar" class="tabs tabs-lifted flex-nowrap min-h-[36px]">
+              <!-- Generated via JS -->
+            </div>
+            <button id="btn-trigger-pivot-modal" class="btn btn-xs sm:btn-sm btn-accent gap-1 flex-none mb-1 shadow-sm">
+              ✨ ➕ Pivot Table
+            </button>
           </div>
-          <div id="table-container" class="flex-1 w-full overflow-hidden p-4"></div>
+
+          <!-- 2. TOOLBAR TABEL (Search, Filter, Export, Pagination Info) -->
+          <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-base-100 border-b border-base-300 flex-none text-xs">
+            <div class="flex items-center gap-2">
+              <div class="relative">
+                <input type="text" id="table-global-search" placeholder="🔍 Cari data..." 
+                       class="input input-xs sm:input-sm input-bordered w-40 sm:w-60" />
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="table-row-count-info" class="text-base-content/60 font-medium">0 baris</span>
+              <select id="table-page-size" class="select select-xs select-bordered">
+                <option value="50">50 / hal</option>
+                <option value="100" selected>100 / hal</option>
+                <option value="250">250 / hal</option>
+                <option value="500">500 / hal</option>
+              </select>
+              <button id="btn-export-csv" class="btn btn-xs sm:btn-sm btn-outline btn-accent">📥 Export CSV</button>
+            </div>
+          </div>
+
+          <!-- 3. CONTAINER GRID TABEL DAISYUI (Sticky Header & Left Stub Column) -->
+          <div id="table-scroll-container" class="flex-1 overflow-auto relative">
+            <table id="main-daisyui-table" class="table table-xs sm:table-sm table-pin-rows table-pin-cols w-full">
+              <thead id="table-head" class="bg-base-200">
+                <!-- Rendered via JS -->
+              </thead>
+              <tbody id="table-body">
+                <!-- Rendered via JS -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 4. PAGINATION FOOTER -->
+          <div class="flex items-center justify-between px-4 py-2 bg-base-200 border-t border-base-300 flex-none text-xs">
+            <span id="pagination-status" class="text-base-content/70">Halaman 1 dari 1</span>
+            <div class="join">
+              <button id="btn-prev-page" class="join-item btn btn-xs btn-outline">« Prev</button>
+              <button id="btn-next-page" class="join-item btn btn-xs btn-outline">Next »</button>
+            </div>
+          </div>
         </div>
 
         <!-- SPA View 3: Dashboard (Visualisasi) -->

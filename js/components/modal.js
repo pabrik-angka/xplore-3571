@@ -1,5 +1,5 @@
 // js/components/modal.js
-import { getAllPolygonSources, getAllBuildingSources } from '../moduleRegistry.js';
+import { getAllPolygonSources } from '../moduleRegistry.js';
 
 /**
  * Xplore 3571 - Spatial Modal Component
@@ -20,10 +20,6 @@ export function openSpatialModal({ title, dataType, options, accept, onProcess, 
 
   if (dataType === 'polygon') {
     selectOptions = getAllPolygonSources().map(src => ({ value: src.id, label: src.name }));
-  } else if (dataType === 'building') {
-    // Jalankan jika sourceRegistry sudah siap
-    // selectOptions = getAllBuildingSources().map(src => ({ value: src.id, label: src.name }));
-    selectOptions = [];
   }
 
   modalContainer.innerHTML = `
