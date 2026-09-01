@@ -8,15 +8,15 @@
 
 ## 1. Ringkasan Fitur & Perubahan Arsitektur
 
-Fitur **"Explorasi Data Tabulasi"** dikembangkan sebagai salah satu pilar utama aplikasi PWA GIS **Xplore 3571** pada hash route `#table`. Fitur ini memungkinkan pengguna untuk memuat data mentah (CSV/GeoJSON), melihatnya dalam tampilan grid interaktif yang cepat, melakukan pencarian, pengurutan multi-kolom, penyaringan dinamis, serta melakukan **Custom Pivot Table** yang hasilnya disajikan dalam **Tab Baru**.
+Fitur **"Explorasi Data Tabulasi"** dikembangkan sebagai salah satu pilar utama aplikasi PWA GIS **Xplore 3571** pada hash route `#table`. Fitur ini memungkinkan pengguna untuk memuat data mentah (CSV/GeoJSON) ukuran besar (50-100MB / 1.000.000 baris) tanpa membuat browser crash (OOM) atau lag. Data dialirkan (stream) langsung ke IndexedDB, diakses secara paginasi (lazy-loading), dan agregasi berat (Pivot) dijalankan sepenuhnya di background worker.
 
 ### Perubahan Utama dari Plan v1:
 - ❌ **Menghapus Luckysheet CDN:** Digantikan dengan **DaisyUI Table (`<table class="table">`)** native yang ringan dan seragam secara estetika.
 - ✅ **CSS Sticky Positioning:** Sticky Header (`sticky top-0`) dan Sticky Column/Stub Kolom (`sticky left-0`).
-- ✅ **Integrasi Sidebar Flag (`is_tabulasi_active: true`):** Setiap modul/data yang diaktifkan melalui Sidebar akan otomatis muncul sebagai **Tab Data Mentah (Raw Tab)** di View Tabulasi.
+- ✅ **IndexedDB-Centric Storage:** Data mentah disimpan dalam IndexedDB, RAM hanya menampung metadata + data halaman aktif (50-500 baris) untuk menghindari Out-of-Memory (OOM).
 - ✅ **Tombol "➕ Pivot Table":** Memanggil Modal/Drawer Builder Pivot untuk membuat agregasi kustom dan membuka hasilnya di **Tab Baru**.
-- ✅ **Non-blocking PapaParse Web Worker:** Parsing CSV puluhan ribu baris di background thread.
-- ✅ **0 Dependency Native Pivot Engine (`js/pivot.js`):** Menggunakan JavaScript ES6+ (`Map`, `Array.reduce`) tanpa library eksternal tua.
+- ✅ **Non-blocking Stream Parsing Web Worker:** PapaParse membaca file secara streaming (`step`) di background thread dan langsung menulis ke IndexedDB per-batch.
+- ✅ **Worker-based Native Pivot Engine (`js/pivot.js`):** Menghitung agregasi pivot di dalam Web Worker agar Main Thread (UI) tetap 60 FPS.
 
 ---
 
@@ -30,83 +30,86 @@ Fitur **"Explorasi Data Tabulasi"** dikembangkan sebagai salah satu pilar utama 
 | **Multi-Dataset Navigation** | Top Tab Bar (`div class="tabs tabs-lifted"`) | Pengguna bisa membuka beberapa dataset berdampingan |
 | **Tombol Aksi Utama Tab** | `➕ Pivot Table` | Membuka Pivot Builder untuk membuat agregasi |
 | **Hasil Pivot** | Tab Baru (`type: 'pivot'`) | Mengisolasi data agregasi tanpa merusak data mentah |
-| **Parsing CSV 100k+ Baris** | `Papa.parse(file, { worker: true })` | UI tidak freeze saat upload file besar |
+| **Parsing CSV 100k+ Baris** | `Papa.parse(fileStream, { worker: true, step: batchWrite })` | Membaca file secara chunk streaming langsung ke IndexedDB untuk mencegah OOM |
+| **Paging Data** | Lazy Loading `LIMIT` & `OFFSET` via IndexedDB | RAM tidak menyimpan seluruh baris data mentah, hanya memuat halaman aktif |
+| **Eksekusi Pivot** | Offloaded ke `data-worker.js` | Mengamankan Main Thread dari pembekuan UI saat mengolah data 100MB |
 | **Cross-View Link** | Klik baris tabel → Event `explore:flyto` | Leaflet otomatis fly-to ke titik koordinat |
 
 ---
 
 ## 3. Template Data Module untuk Explorasi Tabulasi
 
-Berikut adalah template standar untuk membuat modul JS baru yang mendukung kapabilitas tabulasi (`data-modules/template-tabulasi.js`):
+Berikut adalah template standar berbasis **OOP Class** yang mewarisi `BaseModule` untuk membuat modul JS baru yang mendukung kapabilitas tabulasi (`data-modules/template-tabulasi.js`):
 
 ```javascript
 // data-modules/template-tabulasi.js
+import { BaseDataModule } from './BaseModule.js';
+
 /**
  * Template Data Module untuk Xplore 3571
  * Mendukung Explorasi Tabulasi, Spasial, dan Dashboard
  */
+class TemplateTabulasiHandler extends BaseDataModule {
+  constructor() {
+    super({
+      id: 'template-tabulasi',
+      name: 'Nama Modul Tabulasi',
+      type: 'tabulation', // 'tabulation' | 'building' | 'polygon'
+      is_spatial_active: true,
+      is_tabulasi_active: true,
+      is_dashboard_active: false,
+      mandatoryFields: ['id', 'kecamatan', 'desa', 'jumlah_usaha']
+    });
 
-export const templateTabulasiHandler = {
-  id: 'template-tabulasi',
-  name: 'Nama Modul Tabulasi',
-  type: 'tabulation', // 'tabulation' | 'building' | 'polygon'
-
-  // ─── KAPABILITAS FITUR MODUL ──────────────────────────────────
-  is_spatial_active: true,    // true jika data memiliki koordinat lat/lng
-  is_tabulasi_active: true,   // true agar otomatis menambah Tab di View Tabulasi
-  is_dashboard_active: false, // true jika memiliki preset chart
-
-  // Field wajib yang harus ada dalam data mentah
-  mandatoryFields: ['id', 'kecamatan', 'desa', 'jumlah_usaha'],
-
-  /**
-   * Definition Skema Kolom Tabel untuk DaisyUI Table & Pivot Engine
-   */
-  tableSchema: [
-    { key: 'id',           label: 'ID Record',      type: 'string', isStub: true },
-    { key: 'kecamatan',    label: 'Kecamatan',      type: 'string', filterable: true },
-    { key: 'desa',         label: 'Desa / Kel',     type: 'string', filterable: true },
-    { key: 'sektor',       label: 'Sektor Usaha',   type: 'string', filterable: true },
-    { key: 'jumlah_usaha', label: 'Jumlah Usaha',   type: 'number', aggregatable: true },
-    { key: 'latitude',     label: 'Latitude',       type: 'number' },
-    { key: 'longitude',    label: 'Longitude',      type: 'number' }
-  ],
-
-  /**
-   * Validasi format properti data mentah
-   */
-  validate(properties) {
-    const keys = Object.keys(properties).map(k => k.toLowerCase());
-    return this.mandatoryFields.every(field => keys.includes(field));
-  },
+    /**
+     * Definition Skema Kolom Tabel untuk DaisyUI Table & Pivot Engine
+     * Menggunakan konsep Metadata-Driven Schema (isDimension dan isMeasure)
+     */
+    this.tableSchema = [
+      { key: 'id',           label: 'ID Record',      type: 'string', isStub: true },
+      { key: 'kecamatan',    label: 'Kecamatan',      type: 'string', isDimension: true, filterable: true },
+      { key: 'desa',         label: 'Desa / Kel',     type: 'string', isDimension: true, filterable: true },
+      { key: 'sektor',       label: 'Sektor Usaha',   type: 'string', isDimension: true, filterable: true },
+      { key: 'jumlah_usaha', label: 'Jumlah Usaha',   type: 'number', isMeasure: true, aggregatable: true },
+      { key: 'kategori_skala',label: 'Skala Usaha',   type: 'string', isDimension: true }, // Kolom Olahan
+      { key: 'latitude',     label: 'Latitude',       type: 'number' },
+      { key: 'longitude',    label: 'Longitude',      type: 'number' }
+    ];
+  }
 
   /**
    * Transformasi data mentah CSV/GeoJSON menjadi Array of Objects seragam untuk Tabulasi
+   * Menerapkan Pilihan A: Passthrough Otomatis & Kolom Olahan (Calculated Fields)
    */
   toTableRows(rawData, fileType = 'csv') {
     return rawData.map((item, index) => {
-      const p = fileType === 'geojson' ? (item.properties || {}) : item;
+      const p = this.normalizeProperties(fileType === 'geojson' ? (item.properties || {}) : item);
       
       const getProp = (keys) => {
         for (const key of keys) {
-          for (const k in p) {
-            if (k.toLowerCase() === key.toLowerCase()) return p[k];
-          }
+          if (p[key.toLowerCase()] !== undefined) return p[key.toLowerCase()];
         }
         return '-';
       };
 
+      const jmlUsaha = parseInt(getProp(['jumlah_usaha', 'jumlah', 'jml']), 10) || 0;
+      
+      // LOGIKA KOLOM OLAHAN (Calculated Fields)
+      const skala = jmlUsaha > 10 ? 'Menengah/Besar' : 'Kecil';
+
       return {
+        ...p, // Passthrough Otomatis: Menyalin semua properti asli yang tidak memerlukan casting
         id:           getProp(['id', 'ids', 'kode']) || `ROW-${index + 1}`,
         kecamatan:    getProp(['kecamatan', 'nmkec', 'kec']),
         desa:         getProp(['desa', 'nmdesa', 'kelurahan']),
         sektor:       getProp(['sektor', 'sektor_usaha', 'kategori']),
-        jumlah_usaha: parseInt(getProp(['jumlah_usaha', 'jumlah', 'jml']), 10) || 0,
+        jumlah_usaha: jmlUsaha,
+        kategori_skala: skala, // Kolom Olahan baru
         latitude:     parseFloat(getProp(['latitude', 'lat', 'y']) || NaN),
         longitude:    parseFloat(getProp(['longitude', 'lng', 'lon', 'x']) || NaN)
       };
     });
-  },
+  }
 
   /**
    * Transformasi ke objek Spasial Leaflet (hanya jika is_spatial_active: true)
@@ -132,7 +135,9 @@ export const templateTabulasiHandler = {
       searchTitle: `${p.kecamatan} - ${p.desa}`
     };
   }
-};
+}
+
+export const templateTabulasiHandler = new TemplateTabulasiHandler();
 ```
 
 ---
@@ -217,6 +222,26 @@ export const templateTabulasiHandler = {
 </div>
 ```
 
+### A.1 Aturan UI/UX Tab & Ekspor CSV
+Untuk menavigasi multi-dataset dan pivot, Top Tab Bar (`#tabulation-tab-bar`) membedakan 3 kategori tab:
+1. **Tab Data Mentah (Raw Tab):**
+   * **Visual:** Ikon kertas `📄 [Nama Modul] (Raw)`
+   * **Toolbar:** Menampilkan tombol `Filter Kolom` & `Global Search`.
+   * **Perilaku:** Permanen, tidak memiliki tombol silang (`✕`).
+2. **Tab Agregasi Bawaan (Preset Pivot Tab):**
+   * **Visual:** Ikon grafik `📊 [Judul Preset]` (berdasarkan konfigurasi `pivotPresets` modul).
+   * **Toolbar:** Menyembunyikan tombol filter kolom (karena hasil agregasi statis).
+   * **Perilaku:** Otomatis digenerate saat upload sukses. Permanen (tidak bisa ditutup oleh user).
+3. **Tab Custom Pivot (User-defined Tab):**
+   * **Visual:** Ikon bintang `✨ Custom Pivot [N]`
+   * **Toolbar:** Menyembunyikan filter kolom.
+   * **Perilaku:** Dinamis. Memiliki tombol silang (`✕`) untuk menutup dan menghapus tab dari RAM.
+
+### A.2 Engine Deteksi Ekspor CSV Dinamis
+Tombol **📥 Export CSV** di toolbar secara dinamis mendeteksi jenis tab aktif yang sedang dipilih oleh user:
+* **Jika Tab Raw Aktif:** Melakukan ekspor data mentah asinkron yang di-stream langsung dari IndexedDB.
+* **Jika Tab Pivot Aktif (Preset / Custom):** Mengekstrak data matriks hasil kalkulasi pivot yang saat itu ada di memori RAM, lalu menyusunnya menjadi struktur CSV terformat untuk diunduh langsung.
+
 ---
 
 ### B. Layout Modal Builder Pivot (`js/components/pivot-modal.js`)
@@ -296,7 +321,7 @@ Saat tombol `➕ Pivot Table` diklik, dialog ini akan dipanggil:
 
 ## 5. Struktur Data & State Management (`js/store.js`)
 
-State untuk tabulasi dikelola dalam **Map** di `Store` agar performa akses $O(1)$ dan memori terisolasi sempurna:
+State untuk tabulasi dikelola dalam **Map** di `Store` agar performa akses $O(1)$ dan memori terisolasi sempurna. Karena ukuran data mentah sangat besar, **RAM tidak menyimpan keseluruhan array baris dataset mentah**. RAM hanya menyimpan metadata dan data halaman aktif saat ini:
 
 ```javascript
 // js/store.js additions
@@ -316,15 +341,40 @@ export const Store = {
     //   type: 'raw' | 'pivot',
     //   title: '📄 SE2026',
     //   parentDatasetId: null, // Berisi id dataset asal jika type === 'pivot'
-    //   rawData: [ ... ],
+    //   totalRows: 0,          // Total baris riil di IndexedDB
     //   columns: [ { key, label, type, isStub } ],
-    //   filterState: {},
+    //   filterState: {},       // State filter kolom aktif
     //   sortState: [ { field: 'kecamatan', dir: 'asc' } ],
-    //   pagination: { page: 1, pageSize: 100 }
+    //   pagination: { page: 1, pageSize: 100 },
+    //   pageData: [ ... ]      // HANYA data halaman aktif saat ini (50-500 baris)
     // }
     this.tabulationSets.set(tabContext.id, tabContext);
     this.activeTabId = tabContext.id;
     this.emit('tabulation:changed');
+  },
+
+  /**
+   * Memuat data halaman aktif secara asinkron dari IndexedDB berdasarkan state navigasi
+   */
+  async loadActivePageData() {
+    const context = this.getActiveTabContext();
+    if (!context || context.type === 'pivot') return;
+
+    // Hitung offset
+    const offset = (context.pagination.page - 1) * context.pagination.pageSize;
+    const limit = context.pagination.pageSize;
+
+    // Panggil DB helper asinkron untuk mengambil data terbatas (offset, limit, filter, sort)
+    const { rows, total } = await DB.getTabulationPage(context.id, {
+      offset,
+      limit,
+      filters: context.filterState,
+      sort: context.sortState
+    });
+
+    context.pageData = rows;
+    context.totalRows = total;
+    this.emit('tabulation:page-loaded');
   },
 
   getActiveTabContext() {
@@ -346,18 +396,18 @@ export const Store = {
 
 ## 6. Native Custom Pivot Engine (`js/pivot.js`)
 
-Mesin pivot murni Vanilla ES6 (0KB dependency) yang menerima data flat dan mengembalikan matriks tabel pivot:
+Mesin pivot murni Vanilla ES6 (0KB dependency) yang diimpor dan dijalankan **di dalam Web Worker (`js/workers/data-worker.js`)** agar tidak membekukan Main Thread.
 
 ```javascript
 // js/pivot.js
 /**
- * Custom Native ES6 Pivot Engine untuk Xplore 3571
+ * Custom Native ES6 Pivot Engine untuk Xplore 3571 (Dijalankan di Worker)
  */
 
 export const PivotEngine = {
   /**
    * Generate Pivot Matrix
-   * @param {Array<Object>} rawData 
+   * @param {Array<Object>} rawData - Flat data yang diambil langsung oleh worker dari IndexedDB
    * @param {Object} config { rowFields: [], colField: '', valueField: '', aggFunc: 'SUM'|'COUNT'|'AVG' }
    */
   generatePivot(rawData, { rowFields, colField, valueField, aggFunc = 'SUM' }) {
@@ -378,7 +428,6 @@ export const PivotEngine = {
       if (!grouped.has(rowKey)) {
         const rowObj = {};
         rowFields.forEach(f => { rowObj[f] = item[f] ?? '-'; });
-        // Simpan bucket penampung nilai
         grouped.set(rowKey, { rowObj, buckets: {} });
       }
 
@@ -445,8 +494,11 @@ export const PivotEngine = {
 
 - [ ] **STEP 1 — Layout Update (`index.html`):** Tambahkan `#view-table` dengan DaisyUI Top Tab Bar, Toolbar, Table Scroll Container (`<table class="table table-pin-rows table-pin-cols">`), dan Pagination Footer.
 - [ ] **STEP 2 — Data Module Template (`data-modules/template-tabulasi.js`):** Buat template standar untuk handler modul tabulasi.
-- [ ] **STEP 3 — State Manager (`js/store.js`):** Tambahkan Map `tabulationSets`, `activeTabId`, serta helper `addTabulationSet()` dan `removeTabulationSet()`.
-- [ ] **STEP 4 — Native Pivot Engine (`js/pivot.js`):** Implementasikan `PivotEngine.generatePivot()` untuk agregasi data multi-dimensi.
-- [ ] **STEP 5 — Table Engine Controller (`js/table.js`):** Implementasikan rendering DaisyUI Table, Sticky Header/Column CSS, Paginasi (50-500 baris), Multi-Column Sorting, dan Export CSV.
-- [ ] **STEP 6 — Pivot Builder Modal UI (`js/components/pivot-modal.js`):** Buat modal interaktif untuk memilih dimensi pivot (Rows, Columns, Values, Aggregators) yang menambahkan tab baru ke `Store`.
-- [ ] **STEP 7 — Router & Event Linking (`js/router.js` & `js/app.js`):** Daftarkan hash `#table` pada router dan hubungkan event `explore:flyto` dari baris tabel ke peta Leaflet (`js/map.js`).
+- [ ] **STEP 3 — Database Engine (`js/db.js`):** Implementasikan skema penyimpanan IndexedDB, transaksi bulk write per-batch, dan query paging (`LIMIT`/`OFFSET` + sorting + filtering).
+- [ ] **STEP 4 — Web Worker Integration (`js/workers/data-worker.js`):** Integrasikan streaming PapaParse, bulk write ke IndexedDB, BBOX spatial indexer, dan pemicu pivot engine berbasis asinkron.
+- [ ] **STEP 5 — State Manager (`js/store.js`):** Tambahkan Map `tabulationSets`, `activeTabId`, asinkronus `loadActivePageData()`, serta event listener untuk merespons perubahan halaman.
+- [ ] **STEP 6 — Pivot Engine (`js/pivot.js`):** Selesaikan logic pengelompokan agregasi pivot untuk dieksekusi di background worker.
+- [ ] **STEP 7 — Table Engine Controller (`js/table.js`):** Implementasikan rendering tabel, pagination UI navigation, sorting, filtering, and Export CSV.
+- [ ] **STEP 8 — Pivot Builder Modal UI (`js/components/pivot-modal.js`):** Buat modal UI untuk konfigurasi pivot dan kirim tugas kalkulasi ke Web Worker, kemudian tampilkan matriks hasilnya di Tab Baru.
+- [ ] **STEP 9 — Router & Event Linking (`js/router.js` & `js/app.js`):** Daftarkan hash `#table` pada router dan hubungkan event `explore:flyto` dari baris tabel ke peta Leaflet (`js/map.js`).
+- [ ] **STEP 10 — Lazy Map Rendering (`js/map.js`):** Optimalkan pemuatan titik spasial peta agar hanya mengambil koordinat di dalam area BBOX yang aktif dari IndexedDB/Worker.

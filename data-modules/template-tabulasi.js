@@ -1,43 +1,35 @@
 // data-modules/template-tabulasi.js
+import { BaseDataModule } from './BaseModule.js';
+
 /**
  * Template Data Module untuk Xplore 3571 - Explorasi Tabulasi
  * Menyediakan struktur standar untuk modul tabulasi yang reaktif.
  */
+class TemplateTabulasiHandler extends BaseDataModule {
+  constructor() {
+    super({
+      id: 'template-tabulasi',
+      name: 'Nama Modul Tabulasi',
+      type: 'tabulation', // 'tabulation' | 'building' | 'polygon'
+      is_spatial_active: true,
+      is_tabulasi_active: true,
+      is_dashboard_active: false,
+      mandatoryFields: ['id', 'kecamatan', 'desa', 'jumlah_usaha']
+    });
 
-export const templateTabulasiHandler = {
-  id: 'template-tabulasi',
-  name: 'Nama Modul Tabulasi',
-  type: 'tabulation', // 'tabulation' | 'building' | 'polygon'
-
-  // ─── KAPABILITAS FITUR MODUL ──────────────────────────────────
-  is_spatial_active: true,    // true jika data memiliki koordinat lat/lng
-  is_tabulasi_active: true,   // true agar otomatis menambah Tab di View Tabulasi
-  is_dashboard_active: false, // true jika memiliki preset chart
-
-  // Field wajib yang harus ada dalam data mentah
-  mandatoryFields: ['id', 'kecamatan', 'desa', 'jumlah_usaha'],
-
-  /**
-   * Skema Kolom Tabel untuk DaisyUI Table & Pivot Engine
-   */
-  tableSchema: [
-    { key: 'id',           label: 'ID Record',      type: 'string', isStub: true },
-    { key: 'kecamatan',    label: 'Kecamatan',      type: 'string', filterable: true },
-    { key: 'desa',         label: 'Desa / Kel',     type: 'string', filterable: true },
-    { key: 'sektor',       label: 'Sektor Usaha',   type: 'string', filterable: true },
-    { key: 'jumlah_usaha', label: 'Jumlah Usaha',   type: 'number', aggregatable: true },
-    { key: 'latitude',     label: 'Latitude',       type: 'number' },
-    { key: 'longitude',    label: 'Longitude',      type: 'number' }
-  ],
-
-  /**
-   * Validasi format properti data mentah
-   */
-  validate(properties) {
-    if (!properties || typeof properties !== 'object') return false;
-    const keys = Object.keys(properties).map(k => k.toLowerCase());
-    return this.mandatoryFields.every(field => keys.includes(field));
-  },
+    /**
+     * Skema Kolom Tabel untuk DaisyUI Table & Pivot Engine
+     */
+    this.tableSchema = [
+      { key: 'id',           label: 'ID Record',      type: 'string', isStub: true },
+      { key: 'kecamatan',    label: 'Kecamatan',      type: 'string', filterable: true },
+      { key: 'desa',         label: 'Desa / Kel',     type: 'string', filterable: true },
+      { key: 'sektor',       label: 'Sektor Usaha',   type: 'string', filterable: true },
+      { key: 'jumlah_usaha', label: 'Jumlah Usaha',   type: 'number', aggregatable: true },
+      { key: 'latitude',     label: 'Latitude',       type: 'number' },
+      { key: 'longitude',    label: 'Longitude',      type: 'number' }
+    ];
+  }
 
   /**
    * Transformasi data mentah CSV/GeoJSON menjadi Array of Objects seragam untuk Tabulasi
@@ -66,7 +58,7 @@ export const templateTabulasiHandler = {
         longitude:    parseFloat(getProp(['longitude', 'lng', 'lon', 'x']) || NaN)
       };
     });
-  },
+  }
 
   /**
    * Transformasi ke objek Spasial Leaflet (hanya jika is_spatial_active: true)
@@ -97,4 +89,6 @@ export const templateTabulasiHandler = {
       searchTitle: `${kec} - ${desa}`
     };
   }
-};
+}
+
+export const templateTabulasiHandler = new TemplateTabulasiHandler();

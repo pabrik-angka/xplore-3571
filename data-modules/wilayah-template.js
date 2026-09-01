@@ -1,21 +1,26 @@
-// data-modules/wilayah-blank-template.js
+// data-modules/wilayah-template.js
+import { BaseDataModule } from './BaseModule.js';
 
-export const wilayahTemplateHandler = {
-  // Kapabilitas fitur modul — menentukan tombol FAB yang aktif
-  is_spatial_active: true,    // Ditampilkan di peta sebagai layer poligon
-  is_tabulasi_active: true,   // Properti feature bisa dieksplorasi dalam tabel
-  is_dashboard_active: false, // Tidak ada visualisasi dashboard
-  type: 'polygon',
+class WilayahTemplateHandler extends BaseDataModule {
+  constructor() {
+    super({
+      id: 'wilayah-template',
+      name: 'Template Wilayah',
+      type: 'polygon',
+      is_spatial_active: true,
+      is_tabulasi_active: true,
+      is_dashboard_active: false,
+      mandatoryFields: ['kec', 'kel']
+    });
 
-  // 1. Definisikan field/kolom apa saja yang ingin ditampilkan saat di-render
-  // Ini berguna jika nanti Anda ingin membuat tabel informasi otomatis atau detail panel
-  displayFields: [
-    { field: 'kec', label: 'Nama Kecamatan' },
-    { field: 'kel', label: 'Nama Kelurahan/Desa' },
-    { field: 'sls', label: 'Nama SLS / RT-RW' }
-  ],
+    this.displayFields = [
+      { field: 'kec', label: 'Nama Kecamatan' },
+      { field: 'kel', label: 'Nama Kelurahan/Desa' },
+      { field: 'sls', label: 'Nama SLS / RT-RW' }
+    ];
+  }
 
-  // 2. Ekstraksi atribut wajib untuk kebutuhan inti sistem (dropdown cascade & tooltip)
+  // Ekstraksi atribut wajib untuk kebutuhan inti sistem (dropdown cascade & tooltip)
   extractProperties(feature) {
     const p = feature.properties || {};
     
@@ -41,9 +46,9 @@ export const wilayahTemplateHandler = {
       sls: slsVal,
       tooltipHtml: tooltipHtml
     };
-  },
+  }
 
-  // 3. Desain gaya visual (styling) area map
+  // Desain gaya visual (styling) area map
   getStyle() {
     return {
       color: "#4A5568",
@@ -53,4 +58,6 @@ export const wilayahTemplateHandler = {
       fillOpacity: 0.15
     };
   }
-};
+}
+
+export const wilayahTemplateHandler = new WilayahTemplateHandler();

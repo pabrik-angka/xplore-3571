@@ -1,23 +1,28 @@
-// data-modules/bangunan-blank-template.js
+// data-modules/bangunan-template.js
+import { BaseDataModule } from './BaseModule.js';
 
-export const bangunanTemplateHandler = {
-  // Kapabilitas fitur modul — menentukan tombol FAB yang aktif
-  is_spatial_active: true,    // Ditampilkan di peta sebagai titik marker
-  is_tabulasi_active: true,   // Data bisa dieksplorasi dalam tabel
-  is_dashboard_active: false, // Belum ada visualisasi dashboard
-  type: 'building',
+class BangunanTemplateHandler extends BaseDataModule {
+  constructor() {
+    super({
+      id: 'bangunan-template',
+      name: 'Template Bangunan',
+      type: 'building',
+      is_spatial_active: true,
+      is_tabulasi_active: true,
+      is_dashboard_active: false,
+      mandatoryFields: ['id', 'latitude', 'longitude']
+    });
 
-  // 1. Definisikan informasi/field apa saja yang akan ditampilkan di dalam POPUP marker
-  displayFields: [
-    { field: 'id_bgn', label: 'ID Bangunan' },
-    { field: 'nama_pemilik', label: 'Nama Kepala Keluarga / Pemilik' },
-    { field: 'fungsi', label: 'Fungsi Bangunan' },
-    { field: 'catatan', label: 'Keterangan Lapangan' }
-  ],
+    this.displayFields = [
+      { field: 'id_bgn', label: 'ID Bangunan' },
+      { field: 'nama_pemilik', label: 'Nama Kepala Keluarga / Pemilik' },
+      { field: 'fungsi', label: 'Fungsi Bangunan' },
+      { field: 'catatan', label: 'Keterangan Lapangan' }
+    ];
+  }
 
   // 2. Transformasi objek mentah (baik dari baris CSV atau feature GeoJSON) ke standar konfigurasi Leaflet
   toLayerConfig(rawItem, fileType = 'geojson') {
-    // Standardisasi pengambilan properti/kolom berdasarkan tipe berkas
     const p = fileType === 'geojson' ? (rawItem.properties || {}) : rawItem;
     
     // Ekstraksi Koordinat secara fleksibel (mencegah salah nama kolom lintang/bujur)
@@ -61,7 +66,7 @@ export const bangunanTemplateHandler = {
       searchKeyword: searchKeyword,
       searchTitle: searchTitle
     };
-  },
+  }
 
   // 3. Desain opsi penanda marker (misal: warna icon leaflet, ukuran bulatan, dsb)
   getMarkerOptions(rawItem, fileType = 'geojson') {
@@ -82,4 +87,6 @@ export const bangunanTemplateHandler = {
       fillOpacity: 0.9
     };
   }
-};
+}
+
+export const bangunanTemplateHandler = new BangunanTemplateHandler();

@@ -1,0 +1,88 @@
+// js/ui/modal.ui.js
+/**
+ * Xplore 3571 - Spatial Modal UI Controller & Orchestrator
+ * Dipindahkan dari js/components/modal.js ke js/ui/modal.ui.js sesuai arsitektur DDS-Lite.
+ */
+import { getAllPolygonSources } from '../core/moduleRegistry.js';
+
+/**
+ * @param {Object} config Configuration object
+ * @param {string} config.title Judul Modal
+ * @param {string} config.dataType Jenis data untuk dibaca dari registry ('polygon' atau 'building')
+ * @param {Array} [config.options] Opsi manual (jika tidak menggunakan dataType dari registry)
+ * @param {string} config.accept Ekstensi berkas yang diterima (e.g. '.geojson,.csv')
+ * @param {Function} config.onProcess Callback sukses
+ * @param {Function} config.onError Callback error / validasi
+ */
+export function openSpatialModal({ title, dataType, options, accept, onProcess, onError }) {
+  const modalContainer = document.getElementById('modal-container');
+  if (!modalContainer) return;
+
+  let selectOptions = options || [];
+
+  if (dataType === 'polygon') {
+    selectOptions = getAllPolygonSources().map(src => ({ value: src.id, label: src.name }));
+  }
+
+  modalContainer.innerHTML = `
+    <dialog id="spatial-dialog" class="modal">
+      <div class="modal-box max-w-sm rounded-xl border border-base-300 shadow-2xl">
+        <h3 class="font-bold text-lg text-secondary mb-4">📂 ${title}</h3>
+        
+        <div class="form-control gap-3">
+          <div>
+            <label class="label"><span class="label-text font-semibold">1. Pilih Jenis Format Skema Data</span></label>
+            <select id="modal-schema-select" class="select select-bordered select-sm w-full">
+              <option value="" disabled selected>Pilih Skema...</option>
+              ${selectOptions.map(opt => `<option value="${opt.value}">${opt.value === 'wilkerstat-se2026' ? '⭐ ' : ''}${opt.label}</option>`).join('')}
+            </select>
+          </div>
+
+          <div>
+            <label class="label"><span class="label-text font-semibold">2. Pilih File Spasial</span></label>
+            <input type="file" id="modal-file-input" accept="${accept}" class="file-input file-input-bordered file-input-sm w-full" />
+          </div>
+        </div>
+
+        <div class="modal-action mt-6 gap-2">
+          <button id="modal-cancel" class="btn btn-sm btn-ghost cursor-pointer">Batal</button>
+          <button id="modal-submit" class="btn btn-sm btn-primary cursor-pointer">Proses & Peta</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button id="modal-backdrop-close">close</button>
+      </form>
+    </dialog>
+  `;
+
+  const dialog = document.getElementById('spatial-dialog');
+  if (dialog) {
+    dialog.showModal();
+  }
+
+  const closeDialog = () => {
+    dialog.close();
+    setTimeout(() => dialog.remove(), 200);
+  };
+
+  document.getElementById('modal-cancel').addEventListener('click', closeDialog);
+  document.getElementById('modal-backdrop-close').addEventListener('click', (e) => {
+    e.preventDefault();
+    closeDialog();
+  });
+
+  document.getElementById('modal-submit').addEventListener('click', () => {
+    const schemaSelect = document.getElementById('modal-schema-select').value;
+    const fileInput = document.getElementById('modal-file-input').files[0];
+
+    if (!schemaSelect || !fileInput) {
+      if (typeof onError === 'function') {
+        onError('Lengkapi skema dan file terlebih dahulu!', 'warning');
+      }
+      return;
+    }
+
+    onProcess(fileInput, schemaSelect);
+    closeDialog();
+  });
+}
