@@ -21,14 +21,15 @@ Aplikasi dideploy pada **GitHub Pages** (Hosting Statis) tanpa server backend.
 
 > ⚠️ **Batasan CORS:** Fetch ke URL eksternal (misal GitHub Releases untuk file Parquet) harus mendukung CORS header. GitHub Releases dan raw.githubusercontent.com sudah mendukung CORS secara native.
 
-### 1.2 Dua Mode Sumber Data
+### 1.2 Tiga Mode Sumber Data
 
-Aplikasi mendukung dua mode sumber data yang dapat berjalan bersamaan:
+Aplikasi mendukung tiga mode sumber data yang dapat berjalan bersamaan:
 
 | Mode | Sumber | Teknologi | Status |
 |---|---|---|---|
 | **Offline / Upload** | File lokal user (CSV, GeoJSON) | Web Worker + IndexedDB | Existing |
-| **Online / Remote** | File Parquet terenkripsi di GitHub Releases | DuckDB-WASM + AES-256 | [BARU] |
+| **Online / Remote File** | File DuckDB terenkripsi di GitHub Releases | DuckDB-WASM + AES-256 | Existing |
+| **Online / Cloud DB** | Supabase PostgreSQL (Anotasi + Dataset Cloud) | Supabase JS Client (ESM) | [BARU] |
 
 ### Diagram Arsitektur Komponen (Multithreaded & IndexedDB-Centric SPA):
 ```mermaid
@@ -229,7 +230,8 @@ xplore-3571/
     │   │   ├── db.service.js           # IndexedDB CRUD, batch write, transactions
     │   │   ├── storage.service.js      # LocalStorage safe wrapper (UI settings, theme)
     │   │   ├── location.service.js     # Geolocation API & tracking
-    │   │   └── duckdb.service.js       # DuckDB-WASM encrypted query engine
+    │   │   ├── duckdb.service.js       # DuckDB-WASM encrypted query engine
+    │   │   └── supabase.service.js     # Supabase Cloud DB & Annotation R/W Engine
     │   │
     │   └── workers/                    # ── Shared Core Workers ──
     │       └── parser.worker.js        # Stream CSV/GeoJSON parse → IndexedDB bulk write
@@ -407,6 +409,14 @@ js/core/listeners/
 | `duckdb:ready` | `duckdb.service.js` | `store.js` | `{ db }` |
 | `duckdb:query-result` | `duckdb.service.js` | `store.js` | `{ rows, schema }` |
 | `duckdb:error` | `duckdb.service.js` | `storeListener.js` | `{ message }` |
+
+**Supabase Cloud & Annotation Events:**
+
+| Event Name | Emitter | Subscriber | Payload |
+|---|---|---|---|
+| `annotation:created` | `supabase.service.js` | `mapListener.js`, `table.module.js` | `{ annotationRecord }` |
+| `annotation:loaded` | `supabase.service.js` | `store.js` | `{ recordId, annotations }` |
+| `supabase:error` | `supabase.service.js` | `storeListener.js` | `{ message }` |
 
 ## 5. Aliran & Manajemen Data
 
@@ -653,6 +663,35 @@ DBI::dbDisconnect(con, shutdown = TRUE)
 
 ---
 
+### 5.3 Mode Cloud Database: Supabase PostgreSQL (Write & Cloud Datasets)
+
+Untuk kebutuhan **Write Operation** (seperti catat/anotasi titik oleh enumerator lapangan) serta potensi migrasi cloud dataset di masa depan, aplikasi menggunakan **Supabase JS Client v2** via Native ES6 Modules (`@supabase/supabase-js`).
+
+#### Alur Kerja Anotasi & Data Cloud (Supabase):
+
+```
+Enumerator / User di Peta
+    │
+    ▼
+[Modal Input Anotasi] → Form submit (Catatan / Verifikasi Status)
+    │
+    ▼
+supabase.service.js: createAnnotation({ recordId, idsubsls, catatan, enumeratorName })
+    │
+    ▼
+Supabase PostgreSQL (Table: annotations) via REST / Realtime API
+    │
+    ▼
+EventBus.emit('annotation:created') → Refresh Map Marker / Info Popup
+```
+
+#### Keunggulan Arsitektur:
+1. **Multi-User Collaboration**: Petugas lapangan dapat menulis catatan per titik secara langsung dan instan tersimpan di Cloud Database.
+2. **Dashboard Management Super Mudah**: Admin dapat mengedit, menyaring, dan mengunduh (CSV/Excel) seluruh anotasi atau data secara langsung via UI Table Editor Supabase tanpa perlu skrip khusus.
+3. **Persiapan Cloud Migration**: Apabila dataset utama (seperti `wilkerstat` atau `fasih`) akan dipindahkan dari file lokal ke Cloud, cukup tambahkan `supabase.strategy.js` yang dikirim ke `store.js`. Data akan ter-parse otomatis menjadi format `UnifiedRecord` tanpa mengubah layer UI peta atau tabel.
+
+---
+
 ## 6. Integrasi Fitur Spesifik
 
 ### A. Drawer Tabulasi di Halaman Spasial
@@ -765,6 +804,7 @@ Untuk mendukung performa tinggi pada GitHub Pages tanpa build-step:
 * **CSS Framework:** DaisyUI v5 + Tailwind CSS v4 Browser compiler — **disimpan lokal di `assets/vendor/`** (bukan CDN langsung).
 * **GIS Engine:** Leaflet.js v1.9.4 + Leaflet.markercluster — **disimpan lokal di `assets/vendor/`**.
 * **Visualisasi:** ApexCharts.js v6 — **disimpan lokal di `assets/vendor/`**.
+* **Cloud DB & R/W Storage:** Supabase JS Client v2 (`@supabase/supabase-js`) via Native ES6 Module (CDN) untuk operasi anotasi & cloud dataset.
 * **PWA Capability:** Native Service Worker (`sw.js`) dengan strategi Cache-First untuk `assets/vendor/*` dan seluruh aset statis lokal.
 * **EventBus:** `js/core/event-bus.js` — Vanilla JS pub/sub internal, zero dependency.
 * **Workers:** 3 Dedicated Workers terpisah per domain (`parser`, `pivot`, `spatial`).

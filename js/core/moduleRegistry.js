@@ -18,15 +18,14 @@
 
 // ═══ IMPORT SEMUA MODUL DI SINI ═══
 // Untuk menambah modul baru: cukup import dan panggil _register() di bawah.
-import { wilkerstatSE2026 }    from '../../data-modules/wilkerstat.strategy.js';
+import { wilkerstatSE2026 } from '../../data-modules/wilkerstat.strategy.js';
 import { sentraEkonomiHandler } from '../../data-modules/sentra.strategy.js';
 import { usahaSuplemenHandler } from '../../data-modules/usaha-suplemen.strategy.js';
-import { fasihSE2026 }         from '../../data-modules/fasih.strategy.js';
+import { se2026GetagAll } from '../../data-modules/se2026-geotag-usaha-dan-keluarga.js';
 // import { namaModulBaru }   from '../../data-modules/nama-modul-baru.strategy.js';
 
 /** @type {Map<string, Object>} */
 const _registry = new Map();
-
 /**
  * Mendaftarkan sebuah handler ke registry. Handler WAJIB punya properti `id` dan `name`.
  * @param {Object} handler
@@ -44,10 +43,9 @@ function _register(handler) {
 
 // ═══ REGISTRASI BERURUTAN (aman dari circular dependency) ═══
 _register(wilkerstatSE2026);
-_register(fasihSE2026);
+_register(se2026GetagAll);
 _register(sentraEkonomiHandler);
 _register(usahaSuplemenHandler);
-
 // ──────────────────────────────────────────────
 // API PUBLIK
 // ──────────────────────────────────────────────

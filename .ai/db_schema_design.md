@@ -41,18 +41,16 @@
 │                     └──────────────────┘                            │
 └──────────────────────────────────────────────────────────────────────┘
                                 │
-                   ┌────────────┴────────────┐
-                   ▼                         ▼
-          ┌─────────────────┐      ┌──────────────────┐
-          │   IndexedDB     │      │  DuckDB RAM       │
-          │   (Offline)     │      │  (Online)         │
-          │                 │      │                   │
-          │  store.getPage()│      │  store.queryDb()  │
-          └────────┬────────┘      └────────┬──────────┘
-                   └────────────┬────────────┘
-                                ▼
-                    store.js — unified interface
-                    (tidak peduli sumber data)
+                 ┌──────────────┼──────────────┐
+                 ▼              ▼              ▼
+        ┌─────────────────┐ ┌──────────────┐ ┌──────────────────┐
+        │   IndexedDB     │ │  DuckDB RAM  │ │  Supabase Cloud  │
+        │   (Offline)     │ │  (Online)    │ │  (R/W Database)  │
+        └────────┬────────┘ └──────┬───────┘ └────────┬─────────┘
+                 └─────────────────┼──────────────────┘
+                                   ▼
+                       store.js — unified interface
+                       (tidak peduli sumber data)
 ```
 
 ---
@@ -75,10 +73,10 @@ type = 'Tabular'  → data non-spasial   (no coordinates)
 |---|---|---|
 | `id` | `string` | ID unik record. Format: `{moduleId}-{originalId}` atau UUID |
 | `type` | `'Point' \| 'Polygon' \| 'Tabular'` | Discriminator schema |
-| `source` | `'indexeddb' \| 'duckdb'` | Asal pipeline data |
+| `source` | `'indexeddb' \| 'duckdb' \| 'supabase'` | Asal pipeline data |
 | `moduleId` | `string` | ID strategy yang memproduksi record ini (e.g. `'wilkerstat'`) |
-| `id_region` | `string \| null` | **[INDEXED]** Kode wilayah hierarkis 16 digit BPS. `null` jika data tidak punya info wilayah |
-| `region` | `RegionParts \| null` | Pre-parsed level wilayah (kota/kec/kel/sls/subsls) — diturunkan dari `id_region` |
+| `idsubsls` | `string \| null` | **[INDEXED]** 16 digit ID region unik BPS (`OOAABBBCCCDDDDEE`). `null` jika data tidak punya info wilayah |
+| `region` | `RegionParts \| null` | Object identitas wilayah lengkap (`nmprov`, `kdprov`, `nmkab`, `kdkab`, `nmkec`, `kdkec`, `nmdesa`, `kddesa`, `nmsls`, `kdsls`, `idsubsls`, `kdsubsls`) |
 | `properties` | `Record<string, any>` | Semua field data asli + kalkulasi (cast ke tipe yang benar) |
 | `searchKey` | `string` | Pre-computed lowercase string gabungan semua searchable field |
 | `searchFields` | `string[]` | Key dari `properties` yang dimasukkan ke `searchKey` |
@@ -90,13 +88,20 @@ type = 'Tabular'  → data non-spasial   (no coordinates)
   type: "Tabular",
   source: "indexeddb",
   moduleId: "wilkerstat",
-  id_region: "3571001002000000",   // ← Top-level, di-index di IDB
-  region: {                        // ← Pre-parsed, siap dipakai filter UI
-    kota:   "3571",
-    kec:    "3571001",
-    kel:    "3571001002",
-    sls:    "35710010020000",
-    subsls: "3571001002000000"
+  idsubsls: "3571001002000000",   // ← Top-level 16 digit ID region, di-index di IDB
+  region: {                        // ← Pre-parsed 12 field identitas region
+    kdprov:   "35",
+    nmprov:   "Jawa Timur",
+    kdkab:    "71",
+    nmkab:    "Kota Kediri",
+    kdkec:    "001",
+    nmkec:    "Mojoroto",
+    kddesa:   "002",
+    nmdesa:   "Mojoroto",
+    kdsls:    "0000",
+    nmsls:    "Non SLS",
+    kdsubsls: "00",
+    idsubsls: "3571001002000000"
   },
   properties: {
     kode_bangunan: "BDG001",
@@ -112,62 +117,117 @@ type = 'Tabular'  → data non-spasial   (no coordinates)
 
 ---
 
-### 2c. Region ID Schema — `id_region` & `region` (MANDATORY jika data berbasis wilayah BPS)
+### 2c. Region Identity Schema — `idsubsls` & `region` (MANDATORY jika data berbasis wilayah BPS)
 
-#### Format Kode Wilayah
+#### Field Identitas Wilayah (12 Field Wajib)
+
+Setiap record yang berhubungan dengan region **wajib** memiliki 12 field identitas wilayah berikut:
+
+| Field | Tipe | Deskripsi | Contoh / Detail |
+|---|---|---|---|
+| `kdprov` | `string` | Kode Provinsi (2 digit) | `"35"` |
+| `nmprov` | `string` | Nama Provinsi | `"Jawa Timur"` |
+| `kdkab` | `string` | Kode Kabupaten/Kota (2 digit) | `"71"` |
+| `nmkab` | `string` | Nama Kabupaten/Kota | `"Kota Kediri"` |
+| `kdkec` | `string` | Kode Kecamatan (3 digit) | `"001"` |
+| `nmkec` | `string` | Nama Kecamatan | `"Mojoroto"` |
+| `kddesa` | `string` | Kode Desa/Kelurahan (3 digit) | `"002"` |
+| `nmdesa` | `string` | Nama Desa/Kelurahan | `"Mojoroto"` |
+| `kdsls` | `string` | Kode SLS (4 digit) | `"0001"` |
+| `nmsls` | `string` | Nama SLS | `"SLS 0001"` |
+| `kdsubsls` | `string` | Kode Sub-SLS (2 digit) | `"01"` |
+| `idsubsls` | `string` | 16 digit ID region unik (`OOAABBBCCCDDDDEE`) | `"3571001002000101"` |
+
+---
+
+#### Format `idsubsls` (16 Digit Unique Region ID)
 
 ```
-Format: AAAABBBCCCDDDDEE  (16 digit, selalu string)
+Format: OOAABBBCCCDDDDEE  (16 digit, selalu string)
 
-  AAAA  = Level 2 · Kota/Kabupaten    (4 digit)
-  BBB   = Level 3 · Kecamatan         (3 digit)
-  CCC   = Level 4 · Kelurahan/Desa    (3 digit)
-  DDDD  = Level 5 · SLS               (4 digit)
-  EE    = Level 6 · Sub-SLS           (2 digit)
+  OO    = Level 1 · Provinsi          (2 digit) --> kdprov
+  AA    = Level 2 · Kota/Kabupaten    (2 digit) --> kdkab 
+  BBB   = Level 3 · Kecamatan         (3 digit) --> kdkec 
+  CCC   = Level 4 · Kelurahan/Desa    (3 digit) --> kddesa
+  DDDD  = Level 5 · SLS               (4 digit) --> kdsls
+  EE    = Level 6 · Sub-SLS           (2 digit) --> kdsubsls
 
-Contoh: 3571001002000101
-  → 3571        = Kota Kediri
-  → 3571001     = Kec. Mojoroto
-  → 3571001002  = Kel. Mojoroto
-  → 35710010020001  = SLS 0001
-  → 3571001002000101 = Sub-SLS 01
+Contoh Breakdown: 3571001002000101
+  → OO   = 35             (Prov. Jawa Timur · kdprov="35")
+  → AA   = 71             (Kota Kediri · kdkab="71")
+  → BBB  = 001            (Kec. Mojoroto · kdkec="001")
+  → CCC  = 002            (Kel. Mojoroto · kddesa="002")
+  → DDDD = 0001           (SLS 0001 · kdsls="0001")
+  → EE   = 01             (Sub-SLS 01 · kdsubsls="01")
+
+Hierarki Prefix String:
+  → 35                = Prov. Jawa Timur (kdprov="35")
+  → 3571              = Kota Kediri (kdprov+kdkab)
+  → 3571001           = Kec. Mojoroto
+  → 3571001002        = Kel. Mojoroto
+  → 35710010020001    = SLS 0001
+  → 3571001002000101  = Sub-SLS 01 (idsubsls full)
 ```
 
 #### Aturan Padding untuk Data Parsial
 
 Jika data hanya diketahui sampai level tertentu, level di bawahnya **dipad dengan nol**:
 
-| Data diketahui sampai | `id_region` |
+| Data diketahui sampai | `idsubsls` |
 |---|---|
-| Kota saja | `3571000000000000` |
+| Provinsi saja | `3500000000000000` |
+| Kota/Kabupaten | `3571000000000000` |
 | Kecamatan | `3571001000000000` |
 | Kelurahan | `3571001002000000` |
 | SLS | `3571001002000100` |
 | Sub-SLS (full) | `3571001002000101` |
 
-> ⚠️ **Tidak boleh menggunakan string pendek/truncated** (e.g. `"3571001"`). Selalu 16 digit penuh dengan padding nol — ini memastikan `id_region` bisa di-prefix-query secara konsisten di IndexedDB.
+> ⚠️ **Tidak boleh menggunakan string pendek/truncated** (e.g. `"3571001"`). Selalu 16 digit penuh dengan padding nol — ini memastikan `idsubsls` bisa di-prefix-query secara konsisten di IndexedDB.
 
-#### Field `region` — Pre-Parsed Hierarchy
+#### Field `region` — Pre-Parsed Hierarchy & Identity
 
-Field `region` adalah hasil parsing `id_region` yang dilakukan **sekali di strategy saat produksi record**, bukan setiap kali filtering:
+Field `region` memuat 12 field identitas wilayah dan prefix level hierarki untuk kemudahan filter UI:
 
 ```js
 // helpers/region-parser.js — pure function, dipanggil oleh strategy
-export function parseRegion(id_region) {
-  if (!id_region || id_region.length !== 16) return null;
+export function parseRegion(rawRegion) {
+  const {
+    idsubsls,
+    nmprov = "", nmkab = "", nmkec = "", nmdesa = "", nmsls = ""
+  } = rawRegion;
+
+  if (!idsubsls || idsubsls.length !== 16) return null;
+
+  const kdprov   = idsubsls.substring(0, 2);
+  const kdkab    = idsubsls.substring(2, 4);
+  const kdkec    = idsubsls.substring(4, 7);
+  const kddesa   = idsubsls.substring(7, 10);
+  const kdsls    = idsubsls.substring(10, 14);
+  const kdsubsls = idsubsls.substring(14, 16);
+
   return {
-    kota:   id_region.substring(0, 4),   // "3571"
-    kec:    id_region.substring(0, 7),   // "3571001"
-    kel:    id_region.substring(0, 10),  // "3571001002"
-    sls:    id_region.substring(0, 14),  // "35710010020001"
-    subsls: id_region.substring(0, 16),  // "3571001002000101" (full)
+    // 12 Field Identitas Wajib
+    kdprov, nmprov,
+    kdkab, nmkab,
+    kdkec, nmkec,
+    kddesa, nmdesa,
+    kdsls, nmsls,
+    kdsubsls,
+    idsubsls,
+
+    // Prefix Helpers untuk Hierarchical Query
+    provPrefix: kdprov,                               // "35"
+    kabPrefix:  kdprov + kdkab,                       // "3571"
+    kecPrefix:  kdprov + kdkab + kdkec,               // "3571001"
+    kelPrefix:  kdprov + kdkab + kdkec + kddesa,        // "3571001002"
+    slsPrefix:  kdprov + kdkab + kdkec + kddesa + kdsls, // "35710010020001"
   };
 }
 ```
 
-#### Bagaimana `id_region` Mempercepat Filtering
+#### Bagaimana `idsubsls` Mempercepat Filtering
 
-Dengan `id_region` sebagai **indexed field di IndexedDB**, filter wilayah menggunakan **prefix-range query** — tanpa Ray-Casting:
+Dengan `idsubsls` sebagai **indexed field di IndexedDB**, filter wilayah menggunakan **prefix-range query** — tanpa Ray-Casting:
 
 ```js
 // db.service.js — filter by wilayah menggunakan IDBKeyRange
@@ -177,7 +237,7 @@ async function getByRegion(storeName, levelPrefix) {
     levelPrefix,          // lower bound: "3571001"
     levelPrefix + '\uffff'  // upper bound: "3571001" + max char (prefix query)
   );
-  return getAllFromIndex(storeName, 'id_region', range);
+  return getAllFromIndex(storeName, 'idsubsls', range);
   // Hasil: O(log n) lookup via B-tree index ✅
   // Bukan: O(n) scan + Ray-Casting ❌
 }
@@ -187,8 +247,8 @@ async function getByRegion(storeName, levelPrefix) {
 
 | Kondisi Data | Strategi Filter | Kecepatan |
 |---|---|---|
-| `id_region` tersedia (data BPS) | **Prefix-range query** via IDB index | ✅ O(log n) |
-| `id_region = null` (data custom/upload) | **Ray-Casting** via `spatial.worker.js` | ⚠️ O(n) |
+| `idsubsls` tersedia (data BPS) | **Prefix-range query** via IDB index | ✅ O(log n) |
+| `idsubsls = null` (data custom/upload) | **Ray-Casting** via `spatial.worker.js` | ⚠️ O(n) |
 
 `filter-index.js` atau `spatial-filter-manager.js` perlu mengecek `meta.hasRegionId` untuk memilih strategi:
 
@@ -207,28 +267,30 @@ async function filterByWilayah(moduleId, levelPrefix) {
 }
 ```
 
-#### `id_region` pada Polygon Record
+#### `idsubsls` pada Polygon Record
 
-Untuk data **Polygon wilayah**, `id_region` adalah identitas polygon itu sendiri:
+Untuk data **Polygon wilayah**, `idsubsls` adalah identitas polygon itu sendiri:
 
 ```js
 // Polygon kecamatan Mojoroto:
 {
   id: "wilayah-3571001000000000",
   type: "Polygon",
-  id_region: "3571001000000000",  // ID polygon ini sendiri
+  idsubsls: "3571001000000000",  // ID polygon ini sendiri
   region: {
-    kota: "3571",
-    kec:  "3571001",
-    kel:  "3571001000",   // padding nol — level kel tidak relevan untuk polygon kec
-    sls:  "35710010000000",
-    subsls: "3571001000000000"
+    kdprov: "35", nmprov: "Jawa Timur",
+    kdkab: "71", nmkab: "Kota Kediri",
+    kdkec: "001", nmkec: "Mojoroto",
+    kddesa: "000", nmdesa: "-",
+    kdsls: "0000", nmsls: "-",
+    kdsubsls: "00",
+    idsubsls: "3571001000000000"
   },
   ...
 }
 ```
 
-Ini memungkinkan join logis: **titik bangunan yang `region.kec === polygon.region.kec`** adalah titik yang berada di dalam polygon tersebut — tanpa perlu Ray-Casting sama sekali.
+Ini memungkinkan join logis: **titik bangunan yang `region.kecPrefix === polygon.region.kecPrefix`** adalah titik yang berada di dalam polygon tersebut — tanpa perlu Ray-Casting sama sekali.
 
 ---
 
@@ -525,8 +587,8 @@ export const store = {
 | 1 | Semua koordinat WAJIB `[lng, lat]` (GeoJSON) | Semua strategy, semua type |
 | 2 | Konversi ke Leaflet `[lat, lng]` HANYA di `building-layer-manager.js` | Rendering layer only |
 | 3 | Field `source` wajib ada — nilai `'indexeddb'` atau `'duckdb'` | Semua record |
-| 4 | `id_region` WAJIB 16 digit string dengan padding nol, atau `null` | Semua strategy |
-| 5 | Field `region` (parsed hierarchy) wajib diproduksi di strategy, bukan di filter layer | Strategy layer |
+| 4 | `idsubsls` WAJIB 16 digit string (`OOAABBBCCCDDDDEE`) dengan padding nol, atau `null` | Semua strategy |
+| 5 | Field `region` WAJIB memuat 12 field identitas (`nmprov`, `kdprov`, `nmkab`, `kdkab`, `nmkec`, `kdkec`, `nmdesa`, `kddesa`, `nmsls`, `kdsls`, `idsubsls`, `kdsubsls`) & prefix helpers | Strategy layer |
 | 6 | `searchKey` wajib lowercase dan pre-computed saat produksi record | Semua strategy |
 | 7 | `properties` wajib sudah di-cast ke tipe yang benar (number/boolean) | Worker/strategy |
 | 8 | `geometry` wajib ada jika `type = 'Point'` atau `'Polygon'` | Spatial strategy |
@@ -538,11 +600,11 @@ export const store = {
 
 ## 8. IDB Index Design
 
-Untuk mengaktifkan prefix-range query, IndexedDB store harus membuat index pada `id_region`:
+Untuk mengaktifkan prefix-range query, IndexedDB store harus membuat index pada `idsubsls`:
 
 ```js
 // db.service.js — saat createObjectStore
-store.createIndex('id_region', 'id_region', { unique: false });
+store.createIndex('idsubsls', 'idsubsls', { unique: false });
 // unique: false karena bisa ada banyak titik di satu wilayah yang sama
 ```
 
@@ -566,8 +628,53 @@ index.count(range);
 
 | Index Name | Field | unique | Digunakan untuk |
 |---|---|---|---|
-| `id_region` | `id_region` | `false` | Prefix filter wilayah |
+| `idsubsls` | `idsubsls` | `false` | Prefix filter wilayah |
 | `moduleId` | `moduleId` | `false` | Isolasi per dataset |
-| `by_module_region` | `[moduleId, id_region]` | `false` | Filter wilayah dalam satu dataset spesifik |
+| `by_module_region` | `[moduleId, idsubsls]` | `false` | Filter wilayah dalam satu dataset spesifik |
 
-> Compound index `by_module_region` penting agar query tidak mencampur record dari dataset berbeda yang kebetulan punya `id_region` yang sama.
+> Compound index `by_module_region` penting agar query tidak mencampur record dari dataset berbeda yang kebetulan punya `idsubsls` yang sama.
+
+---
+
+## 9. Skema Tabel Cloud Annotation (Supabase PostgreSQL)
+
+Entitas `annotations` disimpan secara terpisah di Supabase PostgreSQL untuk mencatat temuan/anotasi enumerator lapangan per titik bangunan.
+
+### Database Schema Table: `public.annotations`
+
+| Field | Tipe Data | Mandatory | Constraints / Default | Deskripsi |
+|---|---|---|---|---|
+| `id` | `UUID` | ✅ | `PRIMARY KEY DEFAULT gen_random_uuid()` | Unique ID anotasi |
+| `record_id` | `TEXT` | ✅ | `NOT NULL` | Referensi ID `UnifiedRecord.id` (e.g. `"wilkerstat-B001"`) |
+| `module_id` | `TEXT` | ✅ | `NOT NULL` | ID strategy sumber dataset (e.g. `"wilkerstat"`) |
+| `idsubsls` | `VARCHAR(16)` | opsional | `NULL` | 16 digit ID region BPS untuk penyaringan wilayah |
+| `enumerator_name` | `TEXT` | ✅ | `DEFAULT 'Anonim'` | Nama petugas enumerator |
+| `catatan` | `TEXT` | ✅ | `NOT NULL` | Isi catatan / hasil verifikasi lapangan |
+| `status` | `TEXT` | ✅ | `DEFAULT 'pending'` | Status anotasi (`'pending'`, `'verified'`, `'rejected'`) |
+| `created_at` | `TIMESTAMPTZ` | ✅ | `DEFAULT NOW()` | Timestamp dibuat |
+| `updated_at` | `TIMESTAMPTZ` | ✅ | `DEFAULT NOW()` | Timestamp terakhir diperbarui |
+
+### SQL DDL Statement (Supabase Editor):
+
+```sql
+CREATE TABLE public.annotations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    record_id TEXT NOT NULL,
+    module_id TEXT NOT NULL,
+    idsubsls VARCHAR(16),
+    enumerator_name TEXT DEFAULT 'Anonim',
+    catatan TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexing untuk query berkinerja tinggi
+CREATE INDEX idx_annotations_record_id ON public.annotations(record_id);
+CREATE INDEX idx_annotations_idsubsls ON public.annotations(idsubsls);
+
+-- Row Level Security (RLS)
+ALTER TABLE public.annotations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read/write access" ON public.annotations FOR ALL USING (true) WITH CHECK (true);
+```
+

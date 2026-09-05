@@ -1,5 +1,5 @@
 // data-modules/bangunan-template.js
-import { BaseDataModule } from './BaseModule.js';
+import { BaseDataModule } from './BaseStrategy.js';
 
 class BangunanTemplateHandler extends BaseDataModule {
   constructor() {
@@ -24,7 +24,7 @@ class BangunanTemplateHandler extends BaseDataModule {
   // 2. Transformasi objek mentah (baik dari baris CSV atau feature GeoJSON) ke standar konfigurasi Leaflet
   toLayerConfig(rawItem, fileType = 'geojson') {
     const p = fileType === 'geojson' ? (rawItem.properties || {}) : rawItem;
-    
+
     // Ekstraksi Koordinat secara fleksibel (mencegah salah nama kolom lintang/bujur)
     const lat = parseFloat(p.latitude || p.lat || p.y || NaN);
     const lng = parseFloat(p.longitude || p.longitude || p.lng || p.x || NaN);
@@ -44,14 +44,14 @@ class BangunanTemplateHandler extends BaseDataModule {
         </div>
         <div class="space-y-1">
           ${this.displayFields.map(f => {
-            let val = '-';
-            if (f.field === 'id_bgn') val = idBgn;
-            if (f.field === 'nama_pemilik') val = pemilik;
-            if (f.field === 'fungsi') val = fungsiBgn;
-            if (f.field === 'catatan') val = note;
-            
-            return `<div><span class="text-base-content/60 font-medium">${f.label}:</span> <br><span class="text-base-content font-semibold">${val}</span></div>`;
-          }).join('')}
+      let val = '-';
+      if (f.field === 'id_bgn') val = idBgn;
+      if (f.field === 'nama_pemilik') val = pemilik;
+      if (f.field === 'fungsi') val = fungsiBgn;
+      if (f.field === 'catatan') val = note;
+
+      return `<div><span class="text-base-content/60 font-medium">${f.label}:</span> <br><span class="text-base-content font-semibold">${val}</span></div>`;
+    }).join('')}
         </div>
       </div>
     `;
