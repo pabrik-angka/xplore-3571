@@ -224,13 +224,5 @@ function _createSingleMarker(config, style, canvasRenderer) {
   if (config.popupHtml) {
     marker.bindPopup(config.popupHtml);
   }
-  if (config.label && config.label !== '-') {
-    marker.bindTooltip(String(config.label), {
-      permanent: true,
-      direction: 'top',
-      offset: [0, -4],
-      className: 'building-label-tooltip text-[10px] font-bold px-1 py-0 rounded shadow bg-white/90 text-gray-800 border border-gray-300'
-    });
-  }
   return marker;
 }

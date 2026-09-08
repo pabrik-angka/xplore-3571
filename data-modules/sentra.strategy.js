@@ -75,7 +75,7 @@ class SentraEkonomiHandler extends BaseDataModule {
   getMarkerOptions(rawItem, fileType = 'csv') {
     return {
       radius: 6,
-      fillColor: '#f97316', // Orange seragam
+      fillColor: '#1671f9', // Orange seragam
       color: '#ffffff',
       weight: 1.5,
       opacity: 1,
