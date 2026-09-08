@@ -43,6 +43,7 @@ class SE2026GeotagUsaha extends BaseDataModule {
     const nama_komersial = getProp(['nama_komersial']);
     const jenis_usaha_label = getProp(['jenis_usaha_label']);
     const keg_utama = getProp(['keg_utama']);
+    const assignment_id = getProp(['assignment_id']);
 
 
     const popupHtml = `
@@ -62,8 +63,8 @@ class SE2026GeotagUsaha extends BaseDataModule {
         </div>
         <div class="border-t border-base-300 my-2"></div>        
         <div class="text-center">
-          <a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" target="_blank" class="text-blue-600 hover:underline font-medium">
-            Buka di Google Maps
+          <a href="https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/${assignment_id}" target="_blank" class="text-blue-600 hover:underline font-medium">
+            Buka di Fasih-SM
           </a>
         </div>
       </div>
