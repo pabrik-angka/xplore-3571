@@ -178,8 +178,12 @@ export const Store = {
           tabContext.rawData.push(...tableRowsBatch);
 
           if (isFirstBatch) {
-            if (handler.tableSchema && handler.tableSchema.length > 0) {
-              tabContext.columns = handler.tableSchema;
+            const schemaCols = typeof handler.getTableSchema === 'function'
+              ? handler.getTableSchema()
+              : (handler.tableSchema || []);
+
+            if (schemaCols && schemaCols.length > 0) {
+              tabContext.columns = schemaCols;
             } else if (tableRowsBatch.length > 0) {
               tabContext.columns = Object.keys(tableRowsBatch[0]).map((k, i) => ({ key: k, label: k.toUpperCase(), isStub: i === 0 }));
             }

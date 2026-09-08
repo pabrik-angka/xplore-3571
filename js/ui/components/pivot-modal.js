@@ -29,50 +29,50 @@ export function openPivotModal() {
 
   modalContainer.innerHTML = `
     <dialog id="pivot-modal-dialog" class="modal modal-open">
-      <div class="modal-box max-w-md rounded-xl border border-base-300 shadow-2xl p-5">
+      <div class="modal-box max-w-lg rounded-xl border border-base-300 shadow-2xl p-5">
         <h3 class="font-bold text-base text-accent flex items-center gap-2 mb-3">
           📊 Custom Pivot Table Builder
         </h3>
 
         <div class="form-control gap-3 text-xs">
           <div>
-            <label class="label py-1"><span class="label-text font-bold">1. Pilih Sumber Dataset:</span></label>
+            <label class="label py-1"><span class="label-text font-bold">1. Sumber Dataset:</span></label>
             <select id="pivot-select-dataset" class="select select-xs sm:select-sm select-bordered w-full">
               ${datasetOptionsHtml}
             </select>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-            <div class="p-2.5 border border-base-300 rounded-lg bg-base-50 flex flex-col">
-              <label class="font-bold text-accent block mb-1">📌 Baris (Rows):</label>
-              <select id="pivot-select-rows" class="select select-xs select-bordered w-full flex-1" multiple size="4">
+          <div>
+            <label class="label py-1">
+              <span class="label-text font-bold text-accent">2. Baris (Rows) — Pilih satu atau lebih:</span>
+            </label>
+            <div id="pivot-rows-checklist" class="overflow-y-auto max-h-44 border border-base-300 rounded-lg p-2 flex flex-col gap-1 bg-base-50">
+            </div>
+            <span class="text-[10px] text-base-content/50 mt-1 block">Centang field yang ingin dikelompokkan sebagai baris</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div>
+              <label class="font-bold text-accent block mb-1">📌 Kolom (Columns):</label>
+              <select id="pivot-select-cols" class="select select-xs select-bordered w-full">
               </select>
-              <span class="text-[10px] text-base-content/50 mt-1">Tahan Ctrl / Cmd untuk multi-pilih</span>
             </div>
 
-            <div class="p-2.5 border border-base-300 rounded-lg bg-base-50 flex flex-col gap-2">
-              <div>
-                <label class="font-bold text-accent block mb-1">📌 Kolom (Columns):</label>
-                <select id="pivot-select-cols" class="select select-xs select-bordered w-full">
-                </select>
-              </div>
+            <div>
+              <label class="font-bold text-accent block mb-1">📊 Field Nilai (Value):</label>
+              <select id="pivot-select-value" class="select select-xs select-bordered w-full">
+              </select>
+            </div>
 
-              <div>
-                <label class="font-bold text-accent block mb-1">📊 Field Nilai (Value):</label>
-                <select id="pivot-select-value" class="select select-xs select-bordered w-full">
-                </select>
-              </div>
-
-              <div>
-                <label class="font-bold text-accent block mb-1">🧮 Fungsi Agregasi:</label>
-                <select id="pivot-select-agg" class="select select-xs select-bordered w-full">
-                  <option value="COUNT">COUNT (Jumlah Baris)</option>
-                  <option value="SUM" selected>SUM (Total Penjumlahan)</option>
-                  <option value="AVG">AVG (Rata-rata)</option>
-                  <option value="MIN">MIN (Nilai Terkecil)</option>
-                  <option value="MAX">MAX (Nilai Terbesar)</option>
-                </select>
-              </div>
+            <div>
+              <label class="font-bold text-accent block mb-1">🧮 Fungsi Agregasi:</label>
+              <select id="pivot-select-agg" class="select select-xs select-bordered w-full">
+                <option value="COUNT">COUNT (Jumlah Baris)</option>
+                <option value="SUM" selected>SUM (Total Penjumlahan)</option>
+                <option value="AVG">AVG (Rata-rata)</option>
+                <option value="MIN">MIN (Nilai Terkecil)</option>
+                <option value="MAX">MAX (Nilai Terbesar)</option>
+              </select>
             </div>
           </div>
         </div>
@@ -87,7 +87,6 @@ export function openPivotModal() {
 
   const dialog = document.getElementById('pivot-modal-dialog');
   const datasetSelect = document.getElementById('pivot-select-dataset');
-  const rowsSelect = document.getElementById('pivot-select-rows');
   const colsSelect = document.getElementById('pivot-select-cols');
   const valueSelect = document.getElementById('pivot-select-value');
 
@@ -97,19 +96,27 @@ export function openPivotModal() {
 
     const sampleRow = targetDs.rawData[0];
     const keys = Object.keys(sampleRow);
+    const rowsChecklist = document.getElementById('pivot-rows-checklist');
 
-    rowsSelect.innerHTML = keys
-      .map((k, i) => `<option value="${k}" ${i === 0 ? 'selected' : ''}>${k.toUpperCase()}</option>`)
-      .join('');
+    if (rowsChecklist) {
+      rowsChecklist.innerHTML = keys
+        .map((k, i) => `
+          <label class="label cursor-pointer justify-start gap-2 py-0.5 px-1.5 hover:bg-base-200/60 rounded text-xs">
+            <input type="checkbox" value="${k}" class="checkbox checkbox-xs checkbox-primary" ${i === 0 ? 'checked' : ''} />
+            <span class="label-text text-xs truncate">${k}</span>
+          </label>
+        `)
+        .join('');
+    }
 
     colsSelect.innerHTML = `<option value="">-- Tanpa Pivot Kolom --</option>` + 
-      keys.map(k => `<option value="${k}">${k.toUpperCase()}</option>`).join('');
+      keys.map(k => `<option value="${k}">${k}</option>`).join('');
 
     const numericKeys = keys.filter(k => typeof sampleRow[k] === 'number' || !isNaN(parseFloat(sampleRow[k])));
     const defaultNumKey = numericKeys.length > 0 ? numericKeys[0] : keys[0];
 
     valueSelect.innerHTML = keys
-      .map(k => `<option value="${k}" ${k === defaultNumKey ? 'selected' : ''}>${k.toUpperCase()}</option>`)
+      .map(k => `<option value="${k}" ${k === defaultNumKey ? 'selected' : ''}>${k}</option>`)
       .join('');
   };
 
@@ -126,7 +133,8 @@ export function openPivotModal() {
     const targetDs = Store.tabulationSets.get(targetDsId);
     if (!targetDs) return;
 
-    const selectedRows = Array.from(rowsSelect.selectedOptions).map(opt => opt.value);
+    const checkedBoxes = document.querySelectorAll('#pivot-rows-checklist input[type="checkbox"]:checked');
+    const selectedRows = Array.from(checkedBoxes).map(cb => cb.value);
     const selectedCol = colsSelect.value;
     const selectedVal = valueSelect.value;
     const selectedAgg = document.getElementById('pivot-select-agg').value;

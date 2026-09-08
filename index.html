@@ -12,6 +12,123 @@
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css">
+
+  <style>
+    /* =============================================
+     * XPLORE TABLE: Guaranteed CSS (no JIT needed)
+     * ============================================= */
+
+    /* View layout: fill the flex-col parent (main) */
+    #view-table,
+    #view-map,
+    #view-dashboard {
+      flex: 1 1 0%;
+      min-height: 0; /* crucial: allow flex children to shrink */
+    }
+
+    /* Table scroll container: fill remaining space, scroll both axes */
+    #table-scroll-container {
+      flex: 1 1 0%;
+      min-height: 0;
+      overflow: auto;
+      position: relative;
+    }
+
+    /* Table itself: never shrink below content width → triggers horiz scrollbar */
+    #main-daisyui-table {
+      min-width: max-content;
+      width: 100%;
+      border-collapse: separate !important; /* WAJIB agar position:sticky bekerja */
+      border-spacing: 0;
+    }
+
+    /* === Sticky Column # (first) === */
+    #main-daisyui-table thead tr th:first-child,
+    #main-daisyui-table tbody tr td:first-child {
+      position: sticky !important;
+      left: 0 !important;
+      z-index: 20;
+      width: 48px !important;
+      min-width: 48px !important;
+      max-width: 48px !important;
+    }
+    #main-daisyui-table thead tr th:first-child {
+      z-index: 40;
+    }
+
+    /* === Sticky Column ke-2 (stub/label) === */
+    #main-daisyui-table thead tr th:nth-child(2),
+    #main-daisyui-table tbody tr td:nth-child(2) {
+      position: sticky !important;
+      left: 48px !important;
+      z-index: 15;
+    }
+    #main-daisyui-table thead tr th:nth-child(2) {
+      z-index: 35;
+    }
+
+    /* === STICKY HEADER ROW (vertical freeze) ===
+     * Lebih reliable menggunakan thead { sticky } daripada per-th.
+     * thead menjadi sticky block, isinya ikut. */
+    #main-daisyui-table thead {
+      position: sticky !important;
+      top: 0 !important;
+      z-index: 30; /* di atas semua body row */
+    }
+
+    /* Semua th di thead wajib punya background agar konten di bawah tidak tembus */
+    #main-daisyui-table thead tr th {
+      background-color: var(--color-base-200, oklch(93% 0.015 249));
+    }
+
+    /* === STICKY COLUMN # (kolom pertama - horizontal freeze) === */
+    #main-daisyui-table thead tr th:first-child,
+    #main-daisyui-table tbody tr td:first-child {
+      position: sticky !important;
+      left: 0 !important;
+      z-index: 20;
+      width: 48px !important;
+      min-width: 48px !important;
+      max-width: 48px !important;
+      background-color: var(--color-base-100, oklch(97% 0.003 249));
+    }
+    #main-daisyui-table thead tr th:first-child {
+      z-index: 40; /* corner: atas keduanya */
+      background-color: var(--color-base-200, oklch(93% 0.015 249));
+    }
+
+    /* === STICKY COLUMN ke-2 (stub - horizontal freeze) === */
+    #main-daisyui-table thead tr th:nth-child(2),
+    #main-daisyui-table tbody tr td:nth-child(2) {
+      position: sticky !important;
+      left: 48px !important;
+      z-index: 15;
+      background-color: var(--color-base-100, oklch(97% 0.003 249));
+    }
+    #main-daisyui-table thead tr th:nth-child(2) {
+      z-index: 35;
+      background-color: var(--color-base-200, oklch(93% 0.015 249));
+    }
+
+    /* Scrollbar styling (WebKit) */
+    #table-scroll-container::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    #table-scroll-container::-webkit-scrollbar-track {
+      background: var(--color-base-200, #f2f2f2);
+    }
+    #table-scroll-container::-webkit-scrollbar-thumb {
+      background: var(--color-base-300, #d1d5db);
+      border-radius: 4px;
+    }
+    #table-scroll-container::-webkit-scrollbar-thumb:hover {
+      background: var(--color-base-content, #9ca3af);
+    }
+    #table-scroll-container::-webkit-scrollbar-corner {
+      background: var(--color-base-200, #f2f2f2);
+    }
+  </style>
   
   <!-- Leaflet GIS Engine CDN -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -35,14 +152,14 @@
       <div id="navbar-container" class="w-full flex-none"></div>
 
       <!-- Main Viewport Area -->
-      <main class="flex-1 w-full h-full relative z-10">
+      <main class="flex-1 w-full overflow-hidden relative z-10 flex flex-col">
         <!-- SPA View 1: Spasial (Peta) -->
-        <div id="view-map" class="w-full h-full">
+        <div id="view-map" class="flex-1 w-full h-full">
           <div id="map-container" class="w-full h-full"></div>
         </div>
 
         <!-- SPA View 2: Tabulasi (Tabel) -->
-        <div id="view-table" class="hidden w-full h-full bg-base-100 flex flex-col overflow-hidden">
+        <div id="view-table" class="hidden flex-1 bg-base-100 flex flex-col overflow-hidden">
           
           <!-- 1. TOP TAB BAR (Multi-Dataset & Pivot Tabs) -->
           <div class="flex items-center justify-between px-3 pt-2 bg-base-200 border-b border-base-300 flex-none gap-2 overflow-x-auto">
@@ -63,7 +180,7 @@
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <span id="table-row-count-info" class="text-base-content/60 font-medium">0 baris</span>
+              <span id="table-row-count-info" class="text-base-content/60 font-medium whitespace-nowrap">0 baris</span>
               <select id="table-page-size" class="select select-xs select-bordered">
                 <option value="50">50 / hal</option>
                 <option value="100" selected>100 / hal</option>
@@ -76,7 +193,7 @@
 
           <!-- 3. CONTAINER GRID TABEL DAISYUI (Sticky Header & Left Stub Column) -->
           <div id="table-scroll-container" class="flex-1 overflow-auto relative">
-            <table id="main-daisyui-table" class="table table-xs sm:table-sm table-pin-rows table-pin-cols w-full">
+            <table id="main-daisyui-table" class="table table-xs sm:table-sm table-pin-rows min-w-max">
               <thead id="table-head" class="bg-base-200">
                 <!-- Rendered via JS -->
               </thead>
@@ -97,40 +214,41 @@
         </div>
 
         <!-- SPA View 3: Dashboard (Visualisasi) -->
-        <div id="view-dashboard" class="hidden w-full h-full bg-base-100 flex flex-col">
+        <div id="view-dashboard" class="hidden flex-1 bg-base-100 flex flex-col">
           <div class="flex items-center justify-between px-4 py-3 border-b border-base-300 bg-base-50 flex-none">
             <span class="text-sm font-bold text-accent">📈 Dashboard Analisis</span>
           </div>
           <div id="dashboard-container" class="flex-1 w-full overflow-y-auto p-4"></div>
         </div>
 
-        <!-- FAB Router (Floating Action Button) - Pojok Kiri Bawah -->
-        <div id="fab-router-container" class="fab absolute bottom-6 left-6 z-[1000]">
-          <!-- Trigger Button (Menu Toggle) -->
-          <div tabindex="0" role="button" class="btn btn-md btn-circle btn-primary shadow-xl">
-            <span>🧭</span>
-          </div>
-
-          <!-- Close Visual Placeholder -->
-          <div class="fab-close">
-            <span class="btn btn-circle btn-md btn-error shadow-xl">✕</span>
-          </div>
-
-          <!-- Menu items yang muncul ketika FAB dibuka secara vertikal -->
-          <div id="fab-item-map" class="flex items-center gap-2">
-            <span class="badge badge-neutral shadow font-bold text-xs">Spasial</span>
-            <a href="#map" data-route="#map" class="btn btn-circle btn-md shadow-lg">🗺️</a>
-          </div>
-          <div id="fab-item-table" class="flex items-center gap-2 hidden">
-            <span class="badge badge-neutral shadow font-bold text-xs">Tabulasi</span>
-            <a href="#table" data-route="#table" class="btn btn-circle btn-md shadow-lg">📊</a>
-          </div>
-          <div id="fab-item-dashboard" class="flex items-center gap-2 hidden">
-            <span class="badge badge-neutral shadow font-bold text-xs">Dashboard</span>
-            <a href="#dashboard" data-route="#dashboard" class="btn btn-circle btn-md shadow-lg">📈</a>
-          </div>
-        </div>
       </main>
+    </div>
+  </div>
+
+  <!-- FAB Router (Floating Action Button) - Fixed Global Viewport Pojok Kiri Bawah -->
+  <div id="fab-router-container" class="fab fixed bottom-20 left-6 z-[2000]">
+    <!-- Trigger Button (Menu Toggle) -->
+    <div tabindex="0" role="button" class="btn btn-md btn-circle btn-primary shadow-2xl">
+      <span>🧭</span>
+    </div>
+
+    <!-- Close Visual Placeholder -->
+    <div class="fab-close">
+      <span class="btn btn-circle btn-md btn-error shadow-2xl">✕</span>
+    </div>
+
+    <!-- Menu items yang muncul ketika FAB dibuka secara vertikal -->
+    <div id="fab-item-map" class="flex items-center gap-2">
+      <span class="badge badge-neutral shadow font-bold text-xs">Spasial</span>
+      <a href="#map" data-route="#map" class="btn btn-circle btn-md shadow-lg">🗺️</a>
+    </div>
+    <div id="fab-item-table" class="flex items-center gap-2 hidden">
+      <span class="badge badge-neutral shadow font-bold text-xs">Tabulasi</span>
+      <a href="#table" data-route="#table" class="btn btn-circle btn-md shadow-lg">📊</a>
+    </div>
+    <div id="fab-item-dashboard" class="flex items-center gap-2 hidden">
+      <span class="badge badge-neutral shadow font-bold text-xs">Dashboard</span>
+      <a href="#dashboard" data-route="#dashboard" class="btn btn-circle btn-md shadow-lg">📈</a>
     </div>
   </div>
 

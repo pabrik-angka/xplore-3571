@@ -21,7 +21,7 @@
 import { wilkerstatSE2026 } from '../../data-modules/wilkerstat.strategy.js';
 import { sentraEkonomiHandler } from '../../data-modules/sentra.strategy.js';
 import { usahaSuplemenHandler } from '../../data-modules/usaha-suplemen.strategy.js';
-import { se2026GetagUsaha } from '../../data-modules/se2026-geotag-usaha-dan-keluarga.js';
+import { se2026GetagUsaha } from '../../data-modules/se2026-geotag-usaha.js';
 // import { namaModulBaru }   from '../../data-modules/nama-modul-baru.strategy.js';
 
 /** @type {Map<string, Object>} */

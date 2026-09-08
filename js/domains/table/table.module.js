@@ -102,13 +102,18 @@ export const TableEngine = {
       const isActive = tab.id === Store.activeTabId;
       const count = (tab.rawData || []).length;
       const activeClass = isActive ? 'tab-active font-bold text-accent' : 'text-base-content/70';
-      const badgeClass = tab.type === 'pivot' ? 'badge-accent' : 'badge-ghost';
+      const isPivot = tab.type === 'pivot';
+      const badgeClass = isPivot ? 'badge-accent' : 'badge-ghost';
+      // Tombol close hanya untuk tab pivot/custom, bukan tab core data module
+      const closeBtn = isPivot
+        ? `<span class="btn-close-tab hover:text-error ml-1 px-1 rounded transition-colors" data-close-id="${tab.id}">✕</span>`
+        : '';
 
       return `
         <button class="tab ${activeClass} gap-2 flex-none whitespace-nowrap transition-colors" data-tab-id="${tab.id}">
           <span>${tab.title}</span>
           <span class="badge badge-xs sm:badge-sm ${badgeClass}">${count.toLocaleString('id')}</span>
-          <span class="btn-close-tab hover:text-error ml-1 px-1 rounded transition-colors" data-close-id="${tab.id}">✕</span>
+          ${closeBtn}
         </button>
       `;
     }).join('');
@@ -169,15 +174,15 @@ export const TableEngine = {
     // 1. Render Table Head
     headEl.innerHTML = `
       <tr>
-        <th class="w-12 text-center bg-base-200 sticky top-0 z-20 border-b border-base-300">#</th>
+        <th class="text-center bg-base-200 border-b border-r border-base-300">#</th>
         ${columns.map((col, idx) => {
           const isStub = col.isStub || idx === 0;
-          const stubClass = isStub ? 'sticky left-0 z-30 bg-base-200 shadow-sm' : '';
           const sortObj = (activeTab.sortState || []).find(s => s.field === col.key);
           const sortIcon = sortObj ? (sortObj.dir === 'asc' ? ' ▲' : ' ▼') : '';
+          const stubClass = isStub ? 'bg-base-200 border-r border-base-300' : 'bg-base-200';
 
           return `
-            <th class="cursor-pointer hover:bg-base-300 transition-colors bg-base-200 sticky top-0 z-20 border-b border-base-300 whitespace-nowrap ${stubClass}" data-sort-key="${col.key}">
+            <th class="cursor-pointer hover:bg-base-300 transition-colors border-b border-base-300 whitespace-nowrap px-3 py-2 ${stubClass}" data-sort-key="${col.key}">
               <div class="flex items-center justify-between gap-1">
                 <span>${col.label || col.key}</span>
                 <span class="text-accent font-bold text-[10px]">${sortIcon}</span>
@@ -260,7 +265,7 @@ export const TableEngine = {
       }
 
       const tdNum = document.createElement('td');
-      tdNum.className = 'text-center font-mono text-[11px] text-base-content/50 border-b border-base-200';
+      tdNum.className = 'text-center font-mono text-[11px] text-base-content/60 border-b border-r border-base-200 bg-base-100';
       tdNum.textContent = absoluteIndex;
       tr.appendChild(tdNum);
 
@@ -269,9 +274,9 @@ export const TableEngine = {
         const isStub = col.isStub || idx === 0;
         const val = row[col.key] ?? '-';
 
-        let cellClass = 'border-b border-base-200 whitespace-nowrap px-3 py-2';
+        let cellClass = 'border-b border-base-200 whitespace-nowrap px-3 py-2 bg-base-100';
         if (isStub) {
-          cellClass += ' sticky left-0 z-10 bg-base-100 font-semibold text-accent shadow-sm';
+          cellClass += ' font-semibold text-accent border-r border-base-200';
         }
         if (col.type === 'number' || typeof val === 'number') {
           cellClass += ' text-right font-mono';
