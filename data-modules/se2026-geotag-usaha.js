@@ -8,7 +8,7 @@ class SE2026GeotagUsaha extends BaseDataModule {
       name: 'SE2026 Geotag Usaha',
       type: 'building',
       is_spatial_active: true,
-      is_tabulasi_active: true, // Diaktifkan untuk mendukung view tabel & pivot
+      is_tabulasi_active: false, // Diaktifkan untuk mendukung view tabel & pivot
       is_dashboard_active: false,
       mandatoryFields: ['idsubsls', 'assignment_id', 'nama_principal', 'geotag_latitude', 'geotag_longitude']
     });
