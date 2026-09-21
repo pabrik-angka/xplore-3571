@@ -50,6 +50,7 @@ export const MapEngine = {
   polygonSnapshot: null,
   baseLayers: {},
   currentBaseLayer: null,
+  myLocationLayer: null, // Layer group khusus "Lokasi Saya"
 
   // Getters untuk backward-compat / mapping data dari manager
   get buildingLayerGroups() { return BuildingLayerManager.buildingLayerGroups; },
@@ -426,5 +427,70 @@ export const MapEngine = {
         }
       }, 50);
     }, 1500);
+  },
+
+  /**
+   * Menampilkan marker "Lokasi Saya" dengan circle radius akurasi GPS
+   * @param {number} lat
+   * @param {number} lng
+   * @param {number} accuracy - akurasi dalam meter dari Geolocation API
+   */
+  showMyLocation(lat, lng, accuracy) {
+    if (!this.map) return;
+
+    // Hapus layer lama jika ada
+    this.clearMyLocation();
+
+    const latlng = L.latLng(lat, lng);
+
+    // Circle akurasi (radius = accuracy meter)
+    const accuracyCircle = L.circle(latlng, {
+      radius: accuracy,
+      color: '#3b82f6',
+      fillColor: '#93c5fd',
+      fillOpacity: 0.2,
+      weight: 1.5,
+      dashArray: '4 4'
+    });
+
+    // Marker titik posisi
+    const locationMarker = L.circleMarker(latlng, {
+      radius: 10,
+      color: '#ffffff',
+      fillColor: '#3b82f6',
+      fillOpacity: 1,
+      weight: 3
+    }).bindPopup(`
+      <div class="p-2 text-xs min-w-[180px]">
+        <div class="font-bold text-center mb-1">📍 Lokasi Saya</div>
+        <div class="border-t border-base-300 my-1"></div>
+        <div><span class="text-base-content/60">Lat:</span> <span class="font-mono">${lat.toFixed(6)}</span></div>
+        <div><span class="text-base-content/60">Lng:</span> <span class="font-mono">${lng.toFixed(6)}</span></div>
+        <div class="mt-1"><span class="text-base-content/60">Akurasi:</span> <span class="font-semibold">±${Math.round(accuracy)} m</span></div>
+      </div>
+    `, { closeButton: true });
+
+    this.myLocationLayer = L.layerGroup([accuracyCircle, locationMarker]).addTo(this.map);
+
+    // Fly to lokasi dengan zoom yang wajar
+    this.map.flyTo(latlng, Math.max(this.map.getZoom(), 16), {
+      animate: true,
+      duration: 1.2
+    });
+
+    // Auto-buka popup setelah animasi selesai
+    this.map.once('moveend', () => {
+      locationMarker.openPopup();
+    });
+  },
+
+  /**
+   * Hapus layer "Lokasi Saya" dari peta
+   */
+  clearMyLocation() {
+    if (this.myLocationLayer) {
+      this.map.removeLayer(this.myLocationLayer);
+      this.myLocationLayer = null;
+    }
   }
 };

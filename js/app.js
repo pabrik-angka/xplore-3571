@@ -10,6 +10,7 @@ import { Router } from './core/router.js';
 import { Store } from './core/store.js';
 import { DbService } from './core/services/db.service.js';
 import { ListenerManager } from './core/listenerManager.js';
+import { MyLocationComponent } from './ui/components/my-location.js';
 
 async function loadComponent(containerId, filePath) {
   try {
@@ -39,6 +40,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!isMapReady) {
     MapEngine.init('map');
   }
+
+  // 2a. Auto-request GPS saat buka — browser tampilkan native permission prompt
+  //     Jika diizinkan, langsung render marker lokasi di peta
+  MyLocationComponent.requestLocation(({ lat, lng, accuracy }) => {
+    MapEngine.showMyLocation(lat, lng, accuracy);
+  });
 
   // 3. Bangun ulang cache element dan daftarkan Event Listener UI
   UI.reCacheElements();
