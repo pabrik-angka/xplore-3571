@@ -459,7 +459,8 @@ export const MapEngine = {
       fillColor: '#93c5fd',
       fillOpacity: 0.2,
       weight: 1.5,
-      dashArray: '4 4'
+      dashArray: '4 4',
+      interactive: false
     });
 
     this._myLocationMarker = L.circleMarker(latlng, {
@@ -467,16 +468,9 @@ export const MapEngine = {
       color: '#ffffff',
       fillColor: '#3b82f6',
       fillOpacity: 1,
-      weight: 3
-    }).bindPopup(`
-      <div class="p-2 text-xs min-w-[180px]">
-        <div class="font-bold text-center mb-1">📍 Lokasi Saya</div>
-        <div class="border-t border-base-300 my-1"></div>
-        <div><span class="text-base-content/60">Lat:</span> <span class="font-mono">${lat.toFixed(6)}</span></div>
-        <div><span class="text-base-content/60">Lng:</span> <span class="font-mono">${lng.toFixed(6)}</span></div>
-        <div class="mt-1"><span class="text-base-content/60">Akurasi:</span> <span class="font-semibold">±${Math.round(accuracy)} m</span></div>
-      </div>
-    `, { closeButton: true });
+      weight: 3,
+      interactive: false
+    });
 
     this.myLocationLayer = L.layerGroup([this._myAccuracyCircle, this._myLocationMarker]).addTo(this.map);
 
@@ -484,10 +478,6 @@ export const MapEngine = {
     this.map.flyTo(latlng, Math.max(this.map.getZoom(), 16), {
       animate: true,
       duration: 1.2
-    });
-
-    this.map.once('moveend', () => {
-      this._myLocationMarker.openPopup();
     });
   },
 
