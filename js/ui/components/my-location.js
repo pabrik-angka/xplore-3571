@@ -7,6 +7,7 @@
 import { ToastComponent } from './toast.js';
 
 export const MyLocationComponent = {
+  _firstFix: true, // Toast akurasi hanya ditampilkan pada fix pertama
 
   /**
    * Minta lokasi GPS — browser akan tampilkan native permission dialog otomatis.
@@ -21,7 +22,10 @@ export const MyLocationComponent = {
     navigator.geolocation.watchPosition(
       (position) => {
         const { latitude: lat, longitude: lng, accuracy } = position.coords;
-        ToastComponent.showToast(`📍 Lokasi ditemukan (akurasi ±${Math.round(accuracy)}m)`, 'success');
+        if (this._firstFix) {
+          ToastComponent.showToast(`📍 Lokasi ditemukan (akurasi ±${Math.round(accuracy)}m)`, 'success');
+          this._firstFix = false;
+        }
         if (typeof onLocationFound === 'function') {
           onLocationFound({ lat, lng, accuracy });
         }

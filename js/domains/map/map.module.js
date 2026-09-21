@@ -50,7 +50,9 @@ export const MapEngine = {
   polygonSnapshot: null,
   baseLayers: {},
   currentBaseLayer: null,
-  myLocationLayer: null, // Layer group khusus "Lokasi Saya"
+  myLocationLayer: null,    // Layer group khusus "Lokasi Saya"
+  _myLocationMarker: null,  // Referensi circleMarker agar bisa setLatLng
+  _myAccuracyCircle: null,  // Referensi circle akurasi agar bisa setLatLng + setRadius
 
   // Getters untuk backward-compat / mapping data dari manager
   get buildingLayerGroups() { return BuildingLayerManager.buildingLayerGroups; },
@@ -430,7 +432,9 @@ export const MapEngine = {
   },
 
   /**
-   * Menampilkan marker "Lokasi Saya" dengan circle radius akurasi GPS
+   * Menampilkan marker "Lokasi Saya" dengan circle radius akurasi GPS.
+   * Update pertama: buat layer & flyTo.
+   * Update berikutnya: cukup setLatLng + setRadius — tidak recreate, tidak flyTo.
    * @param {number} lat
    * @param {number} lng
    * @param {number} accuracy - akurasi dalam meter dari Geolocation API
@@ -438,13 +442,18 @@ export const MapEngine = {
   showMyLocation(lat, lng, accuracy) {
     if (!this.map) return;
 
-    // Hapus layer lama jika ada
-    this.clearMyLocation();
-
     const latlng = L.latLng(lat, lng);
 
-    // Circle akurasi (radius = accuracy meter)
-    const accuracyCircle = L.circle(latlng, {
+    // --- UPDATE: layer sudah ada, cukup geser posisi ---
+    if (this._myLocationMarker && this._myAccuracyCircle) {
+      this._myLocationMarker.setLatLng(latlng);
+      this._myAccuracyCircle.setLatLng(latlng);
+      this._myAccuracyCircle.setRadius(accuracy);
+      return;
+    }
+
+    // --- INIT PERTAMA: buat layer, flyTo sekali ---
+    this._myAccuracyCircle = L.circle(latlng, {
       radius: accuracy,
       color: '#3b82f6',
       fillColor: '#93c5fd',
@@ -453,8 +462,7 @@ export const MapEngine = {
       dashArray: '4 4'
     });
 
-    // Marker titik posisi
-    const locationMarker = L.circleMarker(latlng, {
+    this._myLocationMarker = L.circleMarker(latlng, {
       radius: 10,
       color: '#ffffff',
       fillColor: '#3b82f6',
@@ -470,27 +478,28 @@ export const MapEngine = {
       </div>
     `, { closeButton: true });
 
-    this.myLocationLayer = L.layerGroup([accuracyCircle, locationMarker]).addTo(this.map);
+    this.myLocationLayer = L.layerGroup([this._myAccuracyCircle, this._myLocationMarker]).addTo(this.map);
 
-    // Fly to lokasi dengan zoom yang wajar
+    // flyTo hanya sekali saat fix pertama
     this.map.flyTo(latlng, Math.max(this.map.getZoom(), 16), {
       animate: true,
       duration: 1.2
     });
 
-    // Auto-buka popup setelah animasi selesai
     this.map.once('moveend', () => {
-      locationMarker.openPopup();
+      this._myLocationMarker.openPopup();
     });
   },
 
   /**
-   * Hapus layer "Lokasi Saya" dari peta
+   * Hapus layer "Lokasi Saya" dari peta dan reset referensi
    */
   clearMyLocation() {
     if (this.myLocationLayer) {
       this.map.removeLayer(this.myLocationLayer);
       this.myLocationLayer = null;
     }
+    this._myLocationMarker = null;
+    this._myAccuracyCircle = null;
   }
 };
