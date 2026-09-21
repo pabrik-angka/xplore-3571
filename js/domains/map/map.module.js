@@ -449,32 +449,31 @@ export const MapEngine = {
       this._myLocationMarker.setLatLng(latlng);
       this._myAccuracyCircle.setLatLng(latlng);
       this._myAccuracyCircle.setRadius(accuracy);
-      return;
+    } else {
+      // --- INIT PERTAMA: buat layer ---
+      this._myAccuracyCircle = L.circle(latlng, {
+        radius: accuracy,
+        color: '#3b82f6',
+        fillColor: '#93c5fd',
+        fillOpacity: 0.2,
+        weight: 1.5,
+        dashArray: '4 4',
+        interactive: false
+      });
+
+      this._myLocationMarker = L.circleMarker(latlng, {
+        radius: 10,
+        color: '#ffffff',
+        fillColor: '#3b82f6',
+        fillOpacity: 1,
+        weight: 3,
+        interactive: false
+      });
+
+      this.myLocationLayer = L.layerGroup([this._myAccuracyCircle, this._myLocationMarker]).addTo(this.map);
     }
 
-    // --- INIT PERTAMA: buat layer, flyTo sekali ---
-    this._myAccuracyCircle = L.circle(latlng, {
-      radius: accuracy,
-      color: '#3b82f6',
-      fillColor: '#93c5fd',
-      fillOpacity: 0.2,
-      weight: 1.5,
-      dashArray: '4 4',
-      interactive: false
-    });
-
-    this._myLocationMarker = L.circleMarker(latlng, {
-      radius: 10,
-      color: '#ffffff',
-      fillColor: '#3b82f6',
-      fillOpacity: 1,
-      weight: 3,
-      interactive: false
-    });
-
-    this.myLocationLayer = L.layerGroup([this._myAccuracyCircle, this._myLocationMarker]).addTo(this.map);
-
-    // flyTo hanya sekali saat fix pertama
+    // Zoom & re-center ke posisi saya setiap kali dipanggil (misal dari FAB)
     this.map.flyTo(latlng, Math.max(this.map.getZoom(), 16), {
       animate: true,
       duration: 1.2

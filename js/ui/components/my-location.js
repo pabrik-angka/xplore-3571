@@ -1,16 +1,15 @@
 // js/ui/components/my-location.js
 /**
- * Komponen "Lokasi Saya" — GPS Geolocation sederhana
+ * Komponen "Lokasi Saya" — GPS one-shot, diperbarui manual via FAB 📍
  * Langsung memanggil Geolocation API (browser menampilkan native permission prompt).
  * Jika diizinkan → callback onLocationFound({ lat, lng, accuracy }).
  */
 import { ToastComponent } from './toast.js';
 
 export const MyLocationComponent = {
-  _firstFix: true, // Toast akurasi hanya ditampilkan pada fix pertama
 
   /**
-   * Minta lokasi GPS — browser akan tampilkan native permission dialog otomatis.
+   * Ambil posisi GPS sekali — dipanggil setiap kali user tap FAB 📍
    * @param {Function} onLocationFound - callback({ lat, lng, accuracy })
    */
   requestLocation(onLocationFound) {
@@ -19,13 +18,10 @@ export const MyLocationComponent = {
       return;
     }
 
-    navigator.geolocation.watchPosition(
+    navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude: lat, longitude: lng, accuracy } = position.coords;
-        if (this._firstFix) {
-          ToastComponent.showToast(`📍 Lokasi ditemukan (akurasi ±${Math.round(accuracy)}m)`, 'success');
-          this._firstFix = false;
-        }
+        ToastComponent.showToast(`📍 Lokasi ditemukan (akurasi ±${Math.round(accuracy)}m)`, 'success');
         if (typeof onLocationFound === 'function') {
           onLocationFound({ lat, lng, accuracy });
         }
@@ -49,3 +45,4 @@ export const MyLocationComponent = {
     }
   }
 };
+
