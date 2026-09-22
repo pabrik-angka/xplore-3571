@@ -5,7 +5,7 @@ import { MapEngine } from '../../domains/map/map.module.js';
 export const SearchComponent = {
   currentSearchResults: [],
   currentPage: 1,
-  itemsPerPage: 10,
+  itemsPerPage: 5,
   containerId: 'search-dropdown-container',
   inputId: 'search-building',
 

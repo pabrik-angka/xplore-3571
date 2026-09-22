@@ -254,6 +254,11 @@ export const Store = {
     const results = [];
 
     this.activeBuildingData.forEach(layerSet => {
+      // Abaikan layer jika modul strategi menentukan is_search_active = false
+      if (layerSet.handler && layerSet.handler.is_search_active === false) {
+        return;
+      }
+
       const sourceName = layerSet.sourceName;
 
       layerSet.points.forEach((pt, index) => {

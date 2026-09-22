@@ -10,6 +10,7 @@ class UsahaSuplemenHandler extends BaseDataModule {
       is_spatial_active: true,
       is_tabulasi_active: false,
       is_dashboard_active: false,
+      is_search_active: false,
       mandatoryFields: ['id', 'nama_usaha', 'deskripsi', 'sektor', 'latitude', 'longitude']
     });
   }

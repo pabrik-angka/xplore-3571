@@ -8,8 +8,9 @@ class FasihSE2026 extends BaseDataModule {
       name: 'Fasih SE2026',
       type: 'building',
       is_spatial_active: true,
-      is_tabulasi_active: true,
-      is_dashboard_active: true,
+      is_tabulasi_active: false,
+      is_dashboard_active: false,
+      is_search_active: false,
       mandatoryFields: ['id', 'is_ditemukan', 'is_prelist', 'is_prelist_usaha', 'Jumlah.Usaha']
     });
   }

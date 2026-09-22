@@ -14,6 +14,7 @@ class TemplateTabulasiHandler extends BaseDataModule {
       is_spatial_active: true,
       is_tabulasi_active: true,
       is_dashboard_active: false,
+      is_search_active: false,
       mandatoryFields: ['id', 'kecamatan', 'desa', 'jumlah_usaha']
     });
 

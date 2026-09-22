@@ -28,6 +28,7 @@ export function registerActiveModule(handler) {
     is_spatial_active: handler.is_spatial_active ?? true,
     is_tabulasi_active: handler.is_tabulasi_active ?? false,
     is_dashboard_active: handler.is_dashboard_active ?? false,
+    is_search_active: handler.is_search_active ?? true,
   });
   _dispatchChanged();
 }

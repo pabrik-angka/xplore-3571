@@ -11,6 +11,7 @@ class WilkerstatSE2026 extends BaseDataModule {
       is_spatial_active: true,
       is_tabulasi_active: false,
       is_dashboard_active: false,
+      is_search_active: false,
       mandatoryFields: ['idsubsls', 'kdkec', 'nmkec', 'kddesa', 'nmdesa', 'kdsls', 'nmsls', 'pml', 'ppl']
     });
     this.maxDepth = 'sls';

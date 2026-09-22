@@ -10,6 +10,7 @@ class SE2026GeotagUsaha extends BaseDataModule {
       is_spatial_active: true,
       is_tabulasi_active: false, // Diaktifkan untuk mendukung view tabel & pivot
       is_dashboard_active: false,
+      is_search_active: true,
       mandatoryFields: ['idsubsls', 'assignment_id', 'nama_principal', 'geotag_latitude', 'geotag_longitude']
     });
   }

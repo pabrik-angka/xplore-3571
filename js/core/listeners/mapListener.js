@@ -7,6 +7,7 @@ import { MapEngine } from '../../domains/map/map.module.js';
 import { registerActiveModule, getAggregatedCapabilities } from '../moduleManager.js';
 import { EventBus } from '../event-bus.js';
 import { MyLocationComponent } from '../../ui/components/my-location.js';
+import { ToastComponent } from '../../ui/components/toast.js';
 
 function _syncFabVisibility(caps) {
   const btnMap = document.getElementById('fab-item-map');
@@ -51,6 +52,45 @@ export function initMapListener() {
       MyLocationComponent.requestLocation(({ lat, lng, accuracy }) => {
         MapEngine.showMyLocation(lat, lng, accuracy);
       });
+    });
+  }
+
+  // Wire-up tombol "Set Lat Lon" manual di sidebar
+  const btnSetLatLon = document.getElementById('btn-set-latlon');
+  const inputLatLon = document.getElementById('input-latlon');
+
+  const handleSetLatLon = () => {
+    if (!inputLatLon) return;
+    const val = inputLatLon.value.trim();
+    if (!val) {
+      ToastComponent.showToast('⚠️ Masukkan koordinat Lat, Lon.', 'warning');
+      return;
+    }
+
+    const parts = val.split(/[\s,]+/).filter(Boolean);
+    if (parts.length < 2) {
+      ToastComponent.showToast('❌ Format salah. Gunakan format: lat, lon (contoh: -6.1754, 106.8272)', 'error');
+      return;
+    }
+
+    const lat = parseFloat(parts[0]);
+    const lng = parseFloat(parts[1]);
+
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      ToastComponent.showToast('❌ Nilai koordinat tidak valid.', 'error');
+      return;
+    }
+
+    MapEngine.showMyLocation(lat, lng, 10);
+    ToastComponent.showToast(`📍 Lokasi Saya diset ke: ${lat.toFixed(5)}, ${lng.toFixed(5)}`, 'success');
+  };
+
+  if (btnSetLatLon) {
+    btnSetLatLon.addEventListener('click', handleSetLatLon);
+  }
+  if (inputLatLon) {
+    inputLatLon.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') handleSetLatLon();
     });
   }
 }

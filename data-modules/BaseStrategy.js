@@ -14,6 +14,7 @@ export class BaseDataModule {
     this.is_spatial_active = config.is_spatial_active ?? false;
     this.is_tabulasi_active = config.is_tabulasi_active ?? true;
     this.is_dashboard_active = config.is_dashboard_active ?? false;
+    this.is_search_active = config.is_search_active ?? true;
     
     this.mandatoryFields = config.mandatoryFields || [];
   }

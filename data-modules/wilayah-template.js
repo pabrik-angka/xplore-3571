@@ -10,6 +10,7 @@ class WilayahTemplateHandler extends BaseDataModule {
       is_spatial_active: true,
       is_tabulasi_active: true,
       is_dashboard_active: false,
+      is_search_active: false,
       mandatoryFields: ['kec', 'kel']
     });
 
