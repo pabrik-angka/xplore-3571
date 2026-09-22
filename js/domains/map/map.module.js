@@ -340,6 +340,9 @@ export const MapEngine = {
         group.addLayer(foundMarker);
       }
       this.map.once('moveend', () => {
+        if (!foundMarker.getPopup() && popupHtml) {
+          foundMarker.bindPopup(popupHtml, { autoPan: false });
+        }
         foundMarker.openPopup();
       });
     } else {

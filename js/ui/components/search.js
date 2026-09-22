@@ -70,16 +70,16 @@ export const SearchComponent = {
         const safeTitle = item.title.replace(/"/g, '&quot;');
         
         listHtml += `
-          <li class="list-row hover:bg-base-200/50 transition-colors">
+          <li class="list-row hover:bg-base-200/50 transition-colors cursor-pointer search-result-item"
+            data-layer="${item.layerId}" 
+            data-lat="${item.lat}" 
+            data-lng="${item.lng}">
             <div class="text-2xl font-thin opacity-30 tabular-nums">${itemNumber}</div>
             <div class="list-col-grow">
               <div class="font-bold text-sm truncate w-40 md:w-56" title="${safeTitle}">${safeTitle}</div>
               <div class="text-[10px] uppercase font-semibold text-primary opacity-80 truncate w-40 md:w-56" title="${item.sourceName}">${item.sourceName}</div>
             </div>
-            <button class="btn btn-square btn-ghost text-secondary hover:bg-secondary/20 btn-point-to-map" 
-              data-layer="${item.layerId}" 
-              data-lat="${item.lat}" 
-              data-lng="${item.lng}">
+            <button class="btn btn-square btn-ghost text-secondary hover:bg-secondary/20 btn-point-to-map pointer-events-none">
               <svg class="size-[1.2em]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g stroke-linejoin="round" stroke-linecap="round" stroke-width="2" fill="none" stroke="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"></path></g></svg>
             </button>
           </li>
@@ -126,13 +126,12 @@ export const SearchComponent = {
       });
     }
 
-    const mapButtons = document.querySelectorAll('.btn-point-to-map');
-    mapButtons.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const targetBtn = e.currentTarget;
-        const layerId = targetBtn.getAttribute('data-layer');
-        const lat = parseFloat(targetBtn.getAttribute('data-lat'));
-        const lng = parseFloat(targetBtn.getAttribute('data-lng'));
+    const searchItems = document.querySelectorAll('.search-result-item');
+    searchItems.forEach(itemEl => {
+      itemEl.addEventListener('click', (e) => {
+        const layerId = itemEl.getAttribute('data-layer');
+        const lat = parseFloat(itemEl.getAttribute('data-lat'));
+        const lng = parseFloat(itemEl.getAttribute('data-lng'));
         
         const pointData = this.currentSearchResults.find(item => item.layerId === layerId && item.lat === lat && item.lng === lng);
         const popupHtml = pointData ? pointData.popupHtml : 'Info Bangunan';
