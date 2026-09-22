@@ -8,10 +8,11 @@
  */
 
 const DB_NAME = 'Xplore3571DB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORES = {
   TABULATION: 'tabulation_store',
-  BUILDING: 'building_store'
+  BUILDING: 'building_store',
+  POLYGON: 'polygon_store'
 };
 
 export const DbService = {
@@ -41,6 +42,9 @@ export const DbService = {
         }
         if (!db.objectStoreNames.contains(STORES.BUILDING)) {
           db.createObjectStore(STORES.BUILDING, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORES.POLYGON)) {
+          db.createObjectStore(STORES.POLYGON, { keyPath: 'id' });
         }
       };
 

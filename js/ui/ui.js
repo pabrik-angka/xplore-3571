@@ -161,15 +161,6 @@ export const UI = {
       Store.processPolygonFile(file, schemaId)
         .then(({ handler, filterMetadata }) => {
           this.showToast(`✔ Berkas berhasil diverifikasi! Memulai rendering peta...`, 'success');
-
-          const filterContainer = document.getElementById('dynamic-filter-container');
-          if (filterContainer) {
-            import('../domains/map/map.module.js').then(({ MapEngine }) => {
-              handler.renderFilterUI(filterContainer, filterMetadata, (criteria) => {
-                MapEngine.applyPolygonFilter(criteria);
-              });
-            });
-          }
           this.showLoading(false);
         })
         .catch((errMessage) => {

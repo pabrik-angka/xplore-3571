@@ -26,10 +26,18 @@ const _onExploreFlyto = ({ lat, lng }) => {
   }
 };
 
-const _onPolygonChanged = ({ polygonData, handler }) => {
+const _onPolygonChanged = ({ polygonData, handler, filterMetadata }) => {
   MapEngine.renderPolygon(polygonData, handler);
   registerActiveModule(handler);
   _syncFabVisibility(getAggregatedCapabilities());
+
+  const filterContainer = document.getElementById('dynamic-filter-container');
+  if (filterContainer && handler && typeof handler.renderFilterUI === 'function') {
+    const meta = filterMetadata || polygonData.features?.map(f => f.properties.filterData) || [];
+    handler.renderFilterUI(filterContainer, meta, (criteria) => {
+      MapEngine.applyPolygonFilter(criteria);
+    });
+  }
 };
 
 const _onBuildingsChanged = ({ buildingLayerSet }) => {

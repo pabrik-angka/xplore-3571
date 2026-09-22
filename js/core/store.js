@@ -6,7 +6,7 @@
  * Mengendalikan State Aplikasi: Active Polygon, Active Buildings, Tabulation Sets,
  * dan komunikasi reaktif menggunakan Centralized EventBus (bukan document.dispatchEvent).
  */
-import { getPolygonHandler } from './moduleRegistry.js';
+import { getPolygonHandler, getModule } from './moduleRegistry.js';
 import { DbService } from './services/db.service.js';
 import { FilterIndex } from '../domains/map/filter-index.js';
 import { EventBus } from './event-bus.js';
@@ -78,6 +78,13 @@ export const Store = {
             filterMetadata: this.filterMetadata
           });
 
+          // Simpan ke IndexedDB PWA Cache
+          DbService.saveDataset(DbService.STORES.POLYGON, {
+            id: 'active_polygon',
+            schemaId,
+            geojsonData: this.activePolygonData
+          });
+
           resolve({
             handler: this.activeHandler,
             filterMetadata: this.filterMetadata,
@@ -111,6 +118,7 @@ export const Store = {
   processBuildingFile(file, targetSource) {
     return new Promise((resolve, reject) => {
       const handler = targetSource.handler;
+      const schemaId = (handler && handler.id) ? handler.id : targetSource.id;
       const sourceRegistryName = targetSource.name;
       const isCsv = file.name.toLowerCase().endsWith('.csv');
       const isGeoJson = file.name.toLowerCase().endsWith('.geojson') || file.name.toLowerCase().endsWith('.json');
@@ -119,7 +127,7 @@ export const Store = {
         return reject('Format file tidak didukung. Gunakan CSV atau GeoJSON.');
       }
 
-      const cleanIdKey = (handler && handler.id) ? handler.id : (targetSource.id || file.name.replace(/[^a-zA-Z0-9]/g, '_'));
+      const cleanIdKey = schemaId || file.name.replace(/[^a-zA-Z0-9]/g, '_');
       const layerId = 'bgn_' + cleanIdKey;
       const fileType = isCsv ? 'csv' : 'geojson';
 
@@ -127,6 +135,7 @@ export const Store = {
 
       const buildingLayerSet = {
         id: layerId,
+        schemaId: schemaId,
         filename: file.name,
         points: [],
         handler: handler,
@@ -213,6 +222,7 @@ export const Store = {
           DbService.saveDataset(DbService.STORES.TABULATION, tabContext);
           DbService.saveDataset(DbService.STORES.BUILDING, {
             id: buildingLayerSet.id,
+            schemaId: buildingLayerSet.schemaId,
             filename: buildingLayerSet.filename,
             sourceName: buildingLayerSet.sourceName,
             points: buildingLayerSet.points
@@ -349,9 +359,31 @@ export const Store = {
    */
   async loadStoredDatasets() {
     try {
+      const storedPolygons = await DbService.getAllDatasets(DbService.STORES.POLYGON);
       const storedTabs = await DbService.getAllDatasets(DbService.STORES.TABULATION);
       const storedBuildings = await DbService.getAllDatasets(DbService.STORES.BUILDING);
 
+      // 1. Restore Polygon Region
+      if (storedPolygons && storedPolygons.length > 0) {
+        const polyRecord = storedPolygons[0];
+        if (polyRecord && polyRecord.geojsonData && polyRecord.geojsonData.features) {
+          const handler = getPolygonHandler(polyRecord.schemaId);
+          if (handler) {
+            this.activePolygonData = polyRecord.geojsonData;
+            this.activeHandler = handler;
+            this.filterMetadata = this.activePolygonData.features.map(f => f.properties.filterData);
+            this.filterIndexTree = FilterIndex.buildFilterIndexTree(this.activePolygonData.features);
+
+            EventBus.emit('app:polygon-changed', {
+              polygonData: this.activePolygonData,
+              handler: this.activeHandler,
+              filterMetadata: this.filterMetadata
+            });
+          }
+        }
+      }
+
+      // 2. Restore Tabulation Datasets
       if (storedTabs && storedTabs.length > 0) {
         storedTabs.forEach(tab => {
           this.tabulationSets.set(tab.id, tab);
@@ -360,15 +392,25 @@ export const Store = {
         EventBus.emit('tabulation:changed', { activeTabId: this.activeTabId, action: 'hydrate' });
       }
 
+      // 3. Restore Building Points Datasets secara Non-Blocking
       if (storedBuildings && storedBuildings.length > 0) {
-        for (const bSet of storedBuildings) {
-          this.activeBuildingData.push(bSet);
-          EventBus.emit('app:buildings-changed', { buildingLayerSet: bSet });
-        }
+        // Tunda sedikit rendering titik bangunan ke idle frame agar UI map/navbar sudah responsive duluan
+        setTimeout(() => {
+          for (const bSet of storedBuildings) {
+            const handler = getModule(bSet.schemaId);
+            bSet.handler = handler || null;
+            this.activeBuildingData.push(bSet);
+            EventBus.emit('app:buildings-changed', { buildingLayerSet: bSet });
+          }
+        }, 100);
       }
 
-      if (storedTabs.length > 0 || storedBuildings.length > 0) {
-        console.log(`✔ IndexedDB PWA Hydrated: ${storedTabs.length} tabulasi, ${storedBuildings.length} layer spasial.`);
+      const totalPolygons = storedPolygons?.length || 0;
+      const totalTabs = storedTabs?.length || 0;
+      const totalBuildings = storedBuildings?.length || 0;
+
+      if (totalPolygons > 0 || totalTabs > 0 || totalBuildings > 0) {
+        console.log(`✔ IndexedDB PWA Hydrated: ${totalPolygons} poligon, ${totalTabs} tabulasi, ${totalBuildings} layer spasial.`);
       }
     } catch (e) {
       console.warn('Gagal me-restore data dari IndexedDB:', e);

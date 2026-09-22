@@ -54,12 +54,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 4. Inisialisasi Table Engine
   TableEngine.init();
 
-  // 5. Inisialisasi PWA IndexedDB & Hydrate Dataset Offline Cache
+  // 5. Daftarkan semua global event listener via ListenerManager
+  ListenerManager.init();
+
+  // 6. Inisialisasi PWA IndexedDB & Hydrate Dataset Offline Cache
   await DbService.init();
   await Store.loadStoredDatasets();
-
-  // 6. Daftarkan semua global event listener via ListenerManager
-  ListenerManager.init();
 
   // 7. Inisialisasi SPA Router
   Router.init();
