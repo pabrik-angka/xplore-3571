@@ -215,6 +215,8 @@ export const BuildingLayerManager = {
 
 /**
  * Helper internal untuk membuat marker dengan tooltip label opsional (misal: nomor bangunan).
+ * Popup dibuat LAZY — hanya saat marker diklik, bukan saat inisialisasi marker.
+ * Ini mencegah ribuan L.Popup object dibuat di memori sekaligus.
  */
 function _createSingleMarker(config, style, canvasRenderer) {
   const marker = L.circleMarker([config.geometry.lat, config.geometry.lng], {
@@ -222,7 +224,13 @@ function _createSingleMarker(config, style, canvasRenderer) {
     renderer: canvasRenderer
   });
   if (config.popupHtml) {
-    marker.bindPopup(config.popupHtml);
+    // Lazy popup: L.Popup baru dibuat hanya saat klik pertama.
+    // Setelah bindPopup pertama, Leaflet akan memakai popup yang sama untuk klik berikutnya.
+    marker.on('click', function () {
+      if (!this._popup) {
+        this.bindPopup(config.popupHtml, { autoPan: false }).openPopup();
+      }
+    });
   }
   return marker;
 }
