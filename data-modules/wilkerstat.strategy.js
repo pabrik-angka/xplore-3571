@@ -45,11 +45,15 @@ class WilkerstatSE2026 extends BaseDataModule {
       </div>
     `;
 
+    const kecVal = p.kdkec ? `${p.kdkec} - ${p.nmkec}` : String(p.nmkec || '').trim();
+    const desaVal = p.kddesa ? `${p.kddesa} - ${p.nmdesa}` : String(p.nmdesa || '').trim();
+    const slsVal = p.kdsls ? `${p.kdsls} - ${p.nmsls}` : String(p.nmsls || '').trim();
+
     return {
       filterData: {
-        kec: String(p.nmkec).trim(),
-        desa: String(p.nmdesa).trim(),
-        sls: String(p.nmsls).trim()
+        kec: kecVal.trim(),
+        desa: desaVal.trim(),
+        sls: slsVal.trim()
       },
       tooltipHtml
     };
